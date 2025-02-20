@@ -75,6 +75,11 @@ source $HOME/.cargo/env && cd aws-nitro-enclaves-nsm-api && cargo build --releas
 mv aws-nitro-enclaves-nsm-api/target/release/libnsm.so /usr/lib64
 mv aws-nitro-enclaves-nsm-api/target/release/nsm.h /usr/include
 
+echo "Done installing dependencies"
+
+popd
+rm -rf tmp
+
 # RUN cmake3 -DCMAKE_PREFIX_PATH=/usr -DCMAKE_INSTALL_PREFIX=/usr -GNinja \
 # 	-S aws-nitro-enclaves-sdk-c -B aws-nitro-enclaves-sdk-c/build
 # RUN cmake3 --build aws-nitro-enclaves-sdk-c/build --parallel $(nproc) --target install

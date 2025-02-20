@@ -71,9 +71,12 @@ sudo cmake3 --build json-c/build --parallel $(nproc)  --target install
 
 # Install aws-nitro-enclaves-nsm-api
 git clone --depth 1 -b v0.4.0 https://github.com/aws/aws-nitro-enclaves-nsm-api.git
-source $HOME/.cargo/env && cd aws-nitro-enclaves-nsm-api && cargo build --release --jobs $(nproc) -p nsm-lib
+source $HOME/.cargo/env && pushd aws-nitro-enclaves-nsm-api && cargo build --release --jobs $(nproc) -p nsm-lib
+popd
+
+# Mv the nsm lib and header to the system paths
 sudo mv aws-nitro-enclaves-nsm-api/target/release/libnsm.so /usr/lib64
-mv aws-nitro-enclaves-nsm-api/target/release/nsm.h /usr/include
+sudo mv aws-nitro-enclaves-nsm-api/target/release/nsm.h /usr/include
 
 echo "Done installing dependencies"
 

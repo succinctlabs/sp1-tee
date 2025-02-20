@@ -1,6 +1,11 @@
-[package]
+[workspace]
 name = "sp1-tee"
-version = "0.1.0"
+members = ["host", "enclave", "common"]
+
+[workspace.package]
+version = "0.0.1"
 edition = "2021"
 
-[dependencies]
+[workspace.dependencies]
+sp1-tee-host = { path = "./host" }
+sp1-tee-enclave = { path = "./enclave" }

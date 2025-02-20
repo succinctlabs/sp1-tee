@@ -1,0 +1,10 @@
+[package]
+name = "sp1-tee-enclave"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+aws-nitro-enclaves-nsm-api = "0.4.0"
+
+[build-dependencies]
+cmake = "0.1"

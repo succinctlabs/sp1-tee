@@ -78,7 +78,7 @@ mv aws-nitro-enclaves-nsm-api/target/release/nsm.h /usr/include
 echo "Done installing dependencies"
 
 popd
-rm -rf tmp
+sudo rm -rf tmp
 
 # RUN cmake3 -DCMAKE_PREFIX_PATH=/usr -DCMAKE_INSTALL_PREFIX=/usr -GNinja \
 # 	-S aws-nitro-enclaves-sdk-c -B aws-nitro-enclaves-sdk-c/build

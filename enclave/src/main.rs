@@ -23,7 +23,7 @@ fn main() {
     // Accept connections from any CID, on port `VSOCK_PORT`.
     
     loop {
-        let listener = match VsockListener::bind_with_cid_port(VMADDR_CID_ANY, VSOCK_PORT) {
+        let listener = match VsockListener::bind_with_cid_port(10, VSOCK_PORT) {
             Ok(listener) => listener,
             Err(e) => {
                 println!("Failed to bind to socket: {:?}", e);

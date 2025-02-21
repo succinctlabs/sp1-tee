@@ -1,5 +1,28 @@
 # Inspired by https://github.com/aws/aws-nitro-enclaves-sdk-c/blob/main/containers/Dockerfile.al2
+# todo!(n): proper attribution
 
+#
+# Installs the deps needed to build the `aws-nitro-enclave-c-sdk` and the `sp1-tee-enclave` crate.
+# 
+# Dependencies:
+# 1. aws-lc
+# 2. s2n-tls
+# 3. aws-c-common
+# 4. aws-c-sdkutils
+# 5. aws-c-cal
+# 6. aws-c-io
+# 7. aws-c-compression
+# 8. aws-c-http
+# 9. aws-c-auth
+# 10. json-c
+# 11. aws-nitro-enclaves-nsm-api
+#
+
+# Note: We include sudo so we can install it outside the docker container for sanity.
+
+set -e
+
+# Install the make deps.
 sudo yum install -y \
 	cmake3 \
 	gcc \
@@ -11,10 +34,13 @@ sudo yum install -y \
 	ninja-build \
 	doxygen
 
+# Install the rust toolchain.
 curl https://sh.rustup.rs -sSf | sh -s -- -y
 
+# Source the cargo env.
 source $HOME/.cargo/env
 
+# Create a tmp dir and treat it as the working directory.
 mkdir tmp
 pushd tmp
 
@@ -82,60 +108,3 @@ echo "Done installing dependencies"
 
 popd
 sudo rm -rf tmp
-
-# RUN cmake3 -DCMAKE_PREFIX_PATH=/usr -DCMAKE_INSTALL_PREFIX=/usr -GNinja \
-# 	-S aws-nitro-enclaves-sdk-c -B aws-nitro-enclaves-sdk-c/build
-# RUN cmake3 --build aws-nitro-enclaves-sdk-c/build --parallel $(nproc) --target install
-# RUN cmake3 --build aws-nitro-enclaves-sdk-c/build --parallel $(nproc) --target docs
-
-# # kmstool-enclave
-# RUN mkdir -p /rootfs
-# WORKDIR /rootfs
-
-# RUN BINS="\
-#     /usr/lib64/libnsm.so \
-#     /usr/bin/kmstool_enclave \
-#     " && \
-#     for bin in $BINS; do \
-#         { echo "$bin"; ldd "$bin" | grep -Eo "/.*lib.*/[^ ]+"; } | \
-#             while read path; do \
-#                 mkdir -p ".$(dirname $path)"; \
-#                 cp -fL "$path" ".$path"; \
-#             done \
-#     done
-
-# RUN mkdir -p /rootfs/etc/pki/tls/certs/ \
-#     && cp -f /etc/pki/tls/certs/* /rootfs/etc/pki/tls/certs/
-# RUN find /rootfs
-
-# FROM scratch as kmstool-enclave
-
-# COPY --from=builder /rootfs /
-
-# ARG REGION
-# ARG ENDPOINT
-# ENV REGION=${REGION}
-# ENV ENDPOINT=${ENDPOINT}
-# CMD ["/usr/bin/kmstool_enclave"]
-
-# # kmstool-instance
-# FROM $BASE_IMAGE as kmstool-instance
-
-# # TODO: building packages statically instead of cleaning up unwanted packages from amazonlinux
-# RUN rpm -e python python-libs python-urlgrabber python2-rpm pygpgme pyliblzma python-iniparse pyxattr python-pycurl amazon-linux-extras yum yum-metadata-parser yum-plugin-ovl yum-plugin-priorities
-# COPY --from=builder /usr/lib64/libnsm.so /usr/lib64/libnsm.so
-# COPY --from=builder /usr/bin/kmstool_instance /kmstool_instance
-# CMD ["/kmstool_instance"]
-
-# # kmstool-enclave-cli
-# FROM $BASE_IMAGE as kmstool-enclave-cli
-
-# # TODO: building packages statically instead of cleaning up unwanted packages from amazonlinux
-# RUN rpm -e python python-libs python-urlgrabber python2-rpm pygpgme pyliblzma python-iniparse pyxattr python-pycurl amazon-linux-extras yum yum-metadata-parser yum-plugin-ovl yum-plugin-priorities
-# COPY --from=builder /usr/lib64/libnsm.so /usr/lib64/libnsm.so
-# COPY --from=builder /usr/bin/kmstool_enclave_cli /kmstool_enclave_cli
-
-# # Test
-# FROM builder as test
-# WORKDIR /tmp/crt-builder
-# RUN cmake3 --build aws-nitro-enclaves-sdk-c/build --parallel $(nproc) --target test

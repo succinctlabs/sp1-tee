@@ -5,6 +5,8 @@ edition.workspace = true
 
 [dependencies]
 aws-nitro-enclaves-nsm-api = "0.4.0"
+k256 = "0.13.4"
+libc = "0.2.169"
 
 [build-dependencies]
 cmake = "0.1"

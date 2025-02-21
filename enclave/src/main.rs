@@ -23,14 +23,20 @@ fn main() {
     // Accept connections from any CID, on port `VSOCK_PORT`.
     
     loop {
-        let Ok(listener) = VsockListener::bind_with_cid_port(HOST_CID, VSOCK_PORT) else {
-            println!("Failed to bind to socket");
-            continue;
+        let listener = match VsockListener::bind_with_cid_port(HOST_CID, VSOCK_PORT) {
+            Ok(listener) => listener,
+            Err(e) => {
+                println!("Failed to bind to socket: {:?}", e);
+                continue;
+            }
         };
          
-        let Ok((stream, addr)) = listener.accept() else {
-            println!("Failed to accept connection");
-            continue;
+        let (stream, addr) = match listener.accept() {
+            Ok((stream, addr)) => (stream, addr),
+            Err(e) => {
+                println!("Failed to accept connection: {:?}", e);
+                continue;
+            }
         };
 
         println!("Accepted connection from {:?}", addr);

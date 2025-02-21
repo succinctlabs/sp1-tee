@@ -1,3 +1,3 @@
 [submodule "enclave/aws-nitro-enclaves-sdk-c"]
-	path = enclave/aws-nitro-enclaves-sdk-c
+	path = enclave-sys/aws-nitro-enclaves-sdk-c
 	url = https://github.com/aws/aws-nitro-enclaves-sdk-c.git

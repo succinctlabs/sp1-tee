@@ -341,13 +341,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sp1-tee-enclave-sys"
-version = "0.0.1"
-dependencies = [
- "cmake",
-]
-
-[[package]]
 name = "sp1-tee-host"
 version = "0.0.1"
 dependencies = [

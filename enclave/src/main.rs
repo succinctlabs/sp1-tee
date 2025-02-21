@@ -23,6 +23,8 @@ fn main() {
     // Accept connections from any CID, on port `VSOCK_PORT`.
     let listener = VsockListener::bind_with_cid_port(HOST_CID, VSOCK_PORT).unwrap();
 
+    loop {}
+
     loop {
         let (stream, addr) = listener.accept().unwrap();
         println!("Accepted connection from {:?}", addr);

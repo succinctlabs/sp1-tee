@@ -1,6 +1,6 @@
 [workspace]
 name = "sp1-tee"
-members = ["host", "enclave", "common", "enclave-sys"]
+members = ["host", "enclave", "common"]
 
 [workspace.package]
 version = "0.0.1"
@@ -8,7 +8,6 @@ edition = "2021"
 
 [workspace.dependencies]
 sp1-tee-enclave = { path = "./enclave" }
-sp1-tee-enclave-sys = { path = "./enclave-sys" }
 sp1-tee-host = { path = "./host" }
 sp1-tee-common = { path = "./common" }
 vsock = "0.5"

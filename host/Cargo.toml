@@ -3,4 +3,14 @@ name = "sp1-tee-host"
 version.workspace = true
 edition.workspace = true
 
+[[bin]]
+name = "sp1-tee-server"
+path = "bin/server.rs"
+
+[[bin]]
+name = "vsock_test"
+path = "bin/vsock_test.rs"
+
 [dependencies]
+sp1-tee-common = { workspace = true }
+vsock = { workspace = true }

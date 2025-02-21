@@ -1,0 +1,16 @@
+[package]
+name = "sp1-tee-enclave-sys"
+version.workspace = true
+edition.workspace = true
+links = "aws-nitro-enclaves-sdk-c"
+build = "build.rs"
+
+[lib]
+name = "sp1_tee_enclave_sys"
+path = "src/lib.rs"
+
+[dependencies]
+
+
+[build-dependencies]
+cmake = "0.1"

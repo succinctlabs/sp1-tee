@@ -21,10 +21,18 @@ fn main() {
     println!("Hello, world!");
 
     // Accept connections from any CID, on port `VSOCK_PORT`.
-    let listener = VsockListener::bind_with_cid_port(HOST_CID, VSOCK_PORT).unwrap();
-
+    
     loop {
-        let (stream, addr) = listener.accept().unwrap();
+        let Ok(listener) = VsockListener::bind_with_cid_port(HOST_CID, VSOCK_PORT) else {
+            println!("Failed to bind to socket");
+            continue;
+        };
+         
+        let Ok((stream, addr)) = listener.accept() else {
+            println!("Failed to accept connection");
+            continue;
+        };
+
         println!("Accepted connection from {:?}", addr);
 
         let mut stream = BufReader::new(stream);

@@ -13,13 +13,15 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # Set the working directory
 WORKDIR /app
 
-# Copy the entire Rust workspace into /app
-COPY . .
+COPY install-deps.sh .
 
 # Make sure your install-deps script is executable and run it
 RUN sed -i 's/sudo //g' install-deps.sh
 RUN chmod +x install-deps.sh
 RUN ./install-deps.sh
+
+# Copy the entire Rust workspace into /app
+COPY . .
 
 # Sanity check that cmake is installed.
 RUN cmake --version

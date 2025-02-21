@@ -23,7 +23,7 @@ docker build -t sp1-tee .
 # Create the EIF from the enclave.
 nitro-cli build-enclave --docker-uri sp1-tee:latest --output-file sp1-tee.eif
 
-# todo!(n): Correct memory size.
+# todo!(n): Correct memory size, CID from env.
 RUN_COMMAND="nitro-cli run-enclave --cpu-count 2 --memory 700 --eif-path sp1-tee.eif --enclave-cid 10"
 
 # Run the enclave, and optionally follow the logs.

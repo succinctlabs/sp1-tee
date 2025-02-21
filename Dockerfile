@@ -10,23 +10,22 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# WORKDIR is not supported by the Nitro Enclave.
-RUN mkdir app
+WORKDIR app
 
-COPY install-deps.sh ./app/
+COPY install-deps.sh ./
 
 # Make sure your install-deps script is executable and run it
-RUN sed -i 's/sudo //g' ./app/install-deps.sh
-RUN chmod +x ./app/install-deps.sh
-RUN cd ./app && ./install-deps.sh
+RUN sed -i 's/sudo //g' ./install-deps.sh
+RUN chmod +x ./install-deps.sh
+RUN ./install-deps.sh
 
 # Copy the entire Rust workspace into /app
-COPY . ./app/ 
+COPY . ./
 
 # Sanity check that cmake is installed.
 RUN cmake --version
 
-RUN cd ./app && cargo build --release --bin sp1-tee-enclave
+RUN cargo build --release --bin sp1-tee-enclave
 
 # ---- Runtime Stage ----
 FROM public.ecr.aws/amazonlinux/amazonlinux:2023

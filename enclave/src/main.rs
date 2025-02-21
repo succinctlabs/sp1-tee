@@ -21,9 +21,7 @@ fn main() {
     println!("Hello, world!");
 
     // Accept connections from any CID, on port `VSOCK_PORT`.
-    let listener = VsockListener::bind_with_cid_port(HOST_CID, VSOCK_PORT).unwrap();
-
-    loop {}
+    let listener = VsockListener::bind_with_cid_port(VMADDR_CID_ANY, VSOCK_PORT).unwrap();
 
     loop {
         let (stream, addr) = listener.accept().unwrap();

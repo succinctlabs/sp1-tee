@@ -7,7 +7,7 @@ VALID_COMMANDS=" ${COMMANDS[*]} "
 
 # Single if-check for both "is $1 empty?" AND "is $1 not in COMMANDS?"
 if [[ -z "$1" || ! $VALID_COMMANDS =~ " $1 " ]]; then
-    echo "Usage: $0 [build|run|terminate] [-f follow]"
+    echo "Usage: $0 [build [-f follow]] | run | terminate ]"
     exit 1
 fi
 
@@ -17,7 +17,7 @@ if [ $1 == "terminate" ]; then
     exit 0
 fi
 
-# Always build the enclave.
+# Always build the enclave from scratch.
 docker build -t sp1-tee .
 
 # Create the EIF from the enclave.

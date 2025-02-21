@@ -24,7 +24,6 @@ RUN ./install-deps.sh
 # Sanity check that cmake is installed.
 RUN cmake --version
 
-# Build the specific Rust binary in release mode
 RUN cargo build --release --bin sp1-tee-enclave
 
 # ---- Runtime Stage ----
@@ -33,5 +32,5 @@ FROM public.ecr.aws/amazonlinux/amazonlinux:2023
 # Copy the binary from the build stage
 COPY --from=builder /app/target/release/sp1-tee-enclave /usr/local/bin/sp1-tee-enclave
 
-# Set the entrypoint to your compiled binary
+# Set the entrypoint to the enclave binary.
 ENTRYPOINT ["/usr/local/bin/sp1-tee-enclave"]

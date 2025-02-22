@@ -4,8 +4,12 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+clap = { version = "4.5.30", features = ["derive"] }
+
 # Protocol deps.
 k256 = "0.13.4"
+rand_core = "0.6"
+sp1-tee-common = { workspace = true }
 
 # executor
 

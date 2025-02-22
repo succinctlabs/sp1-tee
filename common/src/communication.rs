@@ -1,37 +1,47 @@
 use vsock::VsockStream as VsockStreamRaw;
 use std::io::{Read, Write};
+use serde::{Serialize, de::DeserializeOwned};
 
-use crate::EnclaveMessage;
+pub struct EnclaveStream<In, Out> {
+    stream: VsockStreamRaw,
+    _marker: std::marker::PhantomData<(In, Out)>,
+}
 
-pub struct VsockStream(VsockStreamRaw);
-
-impl VsockStream {
+impl<In, Out> EnclaveStream<In, Out> {
     pub fn new(stream: VsockStreamRaw) -> Self {
-        Self(stream)
+        Self { stream, _marker: std::marker::PhantomData }
     }
 
     pub fn connect(cid: u32, port: u32) -> Result<Self, CommunicationError> {
         let stream = VsockStreamRaw::connect_with_cid_port(cid, port)?;
 
-        Ok(Self(stream))
+        Ok(Self { stream, _marker: std::marker::PhantomData })
     }
+}
 
-    pub fn block_on_message(&mut self) -> Result<EnclaveMessage, CommunicationError> {
+impl<In, Out> EnclaveStream<In, Out> 
+    where 
+        In: DeserializeOwned,
+        Out: Serialize,
+{
+    /// Blocking read of a message from the stream.
+    pub fn recv(&mut self) -> Result<In, CommunicationError> {
         // Read a u32 from the stream so we can allocate the correct amount of memory for the message bytes.
         // Interprets this u32 as a be_bytes of the message length.
         let mut message_len_buf = [0; 4];
-        self.0.read_exact(&mut message_len_buf)?;
+        self.stream.read_exact(&mut message_len_buf)?;
 
         let message_len = u32::from_be_bytes(message_len_buf);
 
         let mut message_buf = vec![0; message_len as usize];
 
-        self.0.read_exact(&mut message_buf)?;
+        self.stream.read_exact(&mut message_buf)?;
 
         Ok(bincode::deserialize(&message_buf)?)
     }
 
-    pub fn send_message(&mut self, message: EnclaveMessage) -> Result<(), CommunicationError> {
+    /// Blocking write of a message to the stream.
+    pub fn send(&mut self, message: Out) -> Result<(), CommunicationError> {
         let message_bytes = bincode::serialize(&message)?;
 
         if message_bytes.len() > u32::MAX as usize {
@@ -40,8 +50,8 @@ impl VsockStream {
 
         let message_len = (message_bytes.len() as u32).to_be_bytes();
 
-        self.0.write_all(&message_len)?;
-        self.0.write_all(&message_bytes)?;
+        self.stream.write_all(&message_len)?;
+        self.stream.write_all(&message_bytes)?;
 
         Ok(())
     }

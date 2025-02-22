@@ -1,4 +1,3 @@
-
 # Install the Nitro Enclaves CLI.
 sudo dnf install aws-nitro-enclaves-cli aws-nitro-enclaves-cli-devel -y
 

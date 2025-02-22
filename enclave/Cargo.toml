@@ -5,13 +5,15 @@ edition.workspace = true
 
 [dependencies]
 clap = { workspace = true }
+parking_lot = "0.12.3"
+rand_core = "0.6"
 
 # Protocol deps.
-k256 = "0.13.4"
-rand_core = "0.6"
+k256 = { workspace = true }
 sp1-tee-common = { workspace = true }
 
 # executor
+sp1-core-executor = { workspace = true }
 
 # Transport deps.
 vsock = { workspace = true }

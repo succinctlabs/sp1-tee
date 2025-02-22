@@ -1,20 +1,38 @@
-use sp1_tee_common::{EnclaveMessage, VsockStream};
+use sp1_tee_common::{EnclaveRequest, EnclaveResponse, EnclaveStream};
+
+use clap::Parser;
+
+#[derive(Parser)]
+struct Args {
+    /// The CID of the enclave to connect to.
+    #[clap(short, long)]
+    cid: Option<u32>,
+
+    /// The port of the enclave to connect to.
+    #[clap(short, long)]
+    port: Option<u32>,
+}
 
 fn main() {
+    let Args { cid, port } = Args::parse();
+
     // Accept connections from any CID, on port `VSOCK_PORT`.
-    let mut stream = VsockStream::connect(10, 5005).unwrap();
+    let mut stream = EnclaveStream::connect(cid.unwrap_or(10), port.unwrap_or(5005)).unwrap();
 
-    let msg = EnclaveMessage::PrintMe("Hello, enclave!".to_string());
+    let msg = EnclaveRequest::Print("Hello from the host!".to_string());
 
-    stream.send_message(msg).unwrap();
+    stream.send(msg).unwrap();
 
-    let msg = stream.block_on_message().unwrap();
+    let msg = stream.recv().unwrap();
     match msg {
-        EnclaveMessage::PrintMe(msg) => {
+        EnclaveResponse::Print(msg) => {
             println!("Received message: {}", msg);
         }
+        EnclaveResponse::Ack => {
+            println!("Received Ack");
+        }
         _ => {
-            panic!("Received unexpected message: {:?}", msg);
+            panic!("Received unexpected message: {:?}", msg.type_of());
         }
     }
 }

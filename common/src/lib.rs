@@ -1,35 +1,61 @@
 use serde::{Serialize, Deserialize};
 
 mod communication;
-pub use communication::{VsockStream, CommunicationError};
+pub use communication::{EnclaveStream, CommunicationError};
 
-/// A message sent between the enclave and the host.
-/// 
-/// Depending on the context, this type may have been sent from the host or form the enclave.
 #[derive(Debug, Serialize, Deserialize)]
-pub enum EnclaveMessage {
+pub enum EnclaveRequest {
+    /// Print from the enclave to the debug console.
+    Print(String),
+    /// Request the enclave's signing key for crash tolerane.
     GetEncryptedSigningKey,
-    EncryptedSigningKey(Vec<u8>),
-    SignedPublicValues {
-        // todo
-        a: Vec<u8>,
-    },
+    /// Request the enclave to attest to the signing key.
+    AttestSigningKey,
+    /// An execution request, sent from the host to the enclave.
     Execute {
-        // todo
         stdin: Vec<u8>,
         program: Vec<u8>,
     },
-    PrintMe(String),
+    /// Set the enclave's signing key.
+    SetSigningKey(Vec<u8>),
 }
 
-impl EnclaveMessage {
+#[derive(Debug, Serialize, Deserialize)]
+pub enum EnclaveResponse {
+    /// The enclave's signing key, encrypted with the host's public key.
+    EncryptedSigningKey(Vec<u8>),
+    /// An attestation document with the public key field set.
+    SigningKeyAttestation(Vec<u8>),
+    /// The result of an execution, sent from the enclave to the host.
+    SignedPublicValues {
+        a: Vec<u8>,
+    },
+    /// The receiver of this variant should print this message to stdout.
+    Print(String),
+    /// Indicate to the host that the enclave has received the message.
+    Ack,
+}
+
+impl EnclaveRequest {
     pub fn type_of(&self) -> &'static str {
         match self {
-            EnclaveMessage::GetEncryptedSigningKey => "GetEncryptedSigningKey",
-            EnclaveMessage::EncryptedSigningKey(_) => "EncryptedSigningKey",
-            EnclaveMessage::SignedPublicValues { .. } => "SignedPublicValues",
-            EnclaveMessage::Execute { .. } => "Execute",
-            EnclaveMessage::PrintMe(_) => "PrintMe",
+            EnclaveRequest::Print(_) => "Print",
+            EnclaveRequest::GetEncryptedSigningKey => "GetEncryptedSigningKey",
+            EnclaveRequest::Execute { .. } => "Execute",
+            EnclaveRequest::SetSigningKey(_) => "SetSigningKey",
+            EnclaveRequest::AttestSigningKey => "AttestSigningKey",
+        }
+    }
+}
+
+impl EnclaveResponse {
+    pub fn type_of(&self) -> &'static str {
+        match self {
+            EnclaveResponse::EncryptedSigningKey(_) => "EncryptedSigningKey",   
+            EnclaveResponse::SigningKeyAttestation(_) => "SigningKeyAttestation",
+            EnclaveResponse::SignedPublicValues { .. } => "SignedPublicValues",
+            EnclaveResponse::Print(_) => "Print",
+            EnclaveResponse::Ack => "Ack",
         }
     }
 }

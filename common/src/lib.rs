@@ -6,7 +6,7 @@ pub use communication::{VsockStream, CommunicationError};
 /// A message sent between the enclave and the host.
 /// 
 /// Depending on the context, this type may have been sent from the host or form the enclave.
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum EnclaveMessage {
     GetEncryptedSigningKey,
     EncryptedSigningKey(Vec<u8>),

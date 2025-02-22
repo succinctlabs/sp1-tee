@@ -60,6 +60,8 @@ impl Server {
         match message {
             EnclaveMessage::PrintMe(message) => {
                 println!("{}", message);
+
+                stream.send_message(EnclaveMessage::PrintMe("Hello, host!".to_string())).unwrap();
             },
             _ => {
                 println!("Received unimplented message type: {}", message.type_of());

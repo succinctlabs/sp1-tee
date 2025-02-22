@@ -28,11 +28,11 @@ fn main() {
     std::panic::catch_unwind(|| {
         let args = EnclaveArgs::parse();
 
-        // // Initialize the server.
-        // let server = server::Server::new(args);
+        // Initialize the server.
+        let server = server::Server::new(args);
 
-        // // Run the server, indefinitely.
-        // server.run();
+        // Run the server, indefinitely.
+        server.run();
     }).unwrap_or_else(|e| {
         eprintln!("Panic: {:?}", e);
     });

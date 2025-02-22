@@ -34,4 +34,4 @@ FROM public.ecr.aws/amazonlinux/amazonlinux:2023
 COPY --from=builder /app/target/release/sp1-tee-enclave /usr/local/bin/sp1-tee-enclave
 
 # Set the entrypoint to the enclave binary.
-ENTRYPOINT ["/usr/local/bin/sp1-tee-enclave", "--port", "5005"]
+ENTRYPOINT ["/usr/local/bin/sp1-tee-enclave", "--port", "5005", "--enc-key-arn", "todo"]

@@ -13,7 +13,8 @@ sp1-tee-host = { path = "./host" }
 sp1-tee-common = { path = "./common" }
 
 # Shared dependencies
-vsock = "0.5"
+tokio-vsock = "0.7"
+tokio = { version = "1.4", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 bincode = "1.3.3"
 thiserror = "1.0"

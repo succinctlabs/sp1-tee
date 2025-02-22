@@ -13,5 +13,6 @@ path = "bin/vsock_test.rs"
 
 [dependencies]
 sp1-tee-common = { workspace = true }
-vsock = { workspace = true }
+tokio-vsock = { workspace = true }
 clap = { workspace = true }
+tokio = { workspace = true }

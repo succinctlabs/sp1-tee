@@ -21,7 +21,8 @@ pub struct EnclaveArgs {
     cid: Option<u32>,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     // Initialize the Nitro Enclaves SDK.
     unsafe { ffi::aws_nitro_enclaves_library_init(std::ptr::null_mut()); }
 
@@ -32,5 +33,5 @@ fn main() {
     let server = server::Server::new(args);
 
     // Run the server, indefinitely.
-    server.run();
+    server.run().await;
 }

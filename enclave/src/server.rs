@@ -2,7 +2,7 @@ use crate::EnclaveArgs;
 
 use k256::ecdsa::SigningKey;
 use rand_core::OsRng;
-use vsock::{VsockListener, VsockStream as VsockStreamRaw, VMADDR_CID_ANY};
+use tokio_vsock::{VsockListener, VsockStream as VsockStreamRaw, VMADDR_CID_ANY, VsockAddr};
 
 use std::sync::Arc;
 
@@ -36,16 +36,19 @@ impl Server {
         }
     }
 
-    pub fn run(self) {
+    pub async fn run(self) {
         let this = Arc::new(self);
 
-        let listener =
-            VsockListener::bind_with_cid_port(this.args.cid.unwrap_or(VMADDR_CID_ANY), this.args.port)
-                .expect("Failed to bind to vsock");
+        let addr = VsockAddr::new(this.args.cid.unwrap_or(VMADDR_CID_ANY), this.args.port);
+
+        let listener = VsockListener::bind(addr).expect("Failed to bind to vsock");
 
         loop {
-            let (stream, _) = listener.accept().expect("Failed to accept connection");
+            let (stream, _) = listener.accept().await.expect("Failed to accept connection");
 
+            // Spawn a new (blocking) thread to handle the request.
+            //
+            // Tokio tasks aren't preferable here as exeuction (the most likely request type) should be considered blocking.
             std::thread::spawn({
                 let this = this.clone();
 
@@ -59,28 +62,28 @@ impl Server {
     pub fn handle_connection(&self, stream: VsockStreamRaw) {
         let mut stream = EnclaveStream::<EnclaveRequest, EnclaveResponse>::new(stream);
 
-        let message = stream.recv().unwrap();
+        let message = stream.blocking_recv().unwrap();
 
         match message {
             EnclaveRequest::Print(message) => {
                 println!("{}", message);
 
-                stream.send(EnclaveResponse::Ack).unwrap();
+                stream.blocking_send(EnclaveResponse::Ack).unwrap();
             },
             EnclaveRequest::AttestSigningKey => {
                 let attestation = self.attest_signing_key();
 
-                stream.send(EnclaveResponse::SigningKeyAttestation(attestation)).unwrap();
+                stream.blocking_send(EnclaveResponse::SigningKeyAttestation(attestation)).unwrap();
             },
             EnclaveRequest::GetEncryptedSigningKey => {
                 let ciphertext = self.get_signing_key();
 
-                stream.send(EnclaveResponse::EncryptedSigningKey(ciphertext)).unwrap();
+                stream.blocking_send(EnclaveResponse::EncryptedSigningKey(ciphertext)).unwrap();
             },
             EnclaveRequest::SetSigningKey(ciphertext) => {
                 self.set_signing_key(ciphertext);
 
-                stream.send(EnclaveResponse::Ack).unwrap();
+                stream.blocking_send(EnclaveResponse::Ack).unwrap();
             },
             EnclaveRequest::Execute { stdin, program } => {
                 let _res = self.execute(stdin, program);

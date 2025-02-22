@@ -16,7 +16,8 @@ sp1-tee-common = { workspace = true }
 sp1-core-executor = { workspace = true }
 
 # Transport deps.
-vsock = { workspace = true }
+tokio-vsock = { workspace = true }
+tokio = { workspace = true }
 
 [build-dependencies]
 cmake = "0.1"

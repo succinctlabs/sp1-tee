@@ -13,17 +13,18 @@ struct Args {
     port: Option<u32>,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let Args { cid, port } = Args::parse();
 
     // Accept connections from any CID, on port `VSOCK_PORT`.
-    let mut stream = EnclaveStream::connect(cid.unwrap_or(10), port.unwrap_or(5005)).unwrap();
+    let mut stream = EnclaveStream::connect(cid.unwrap_or(10), port.unwrap_or(5005)).await.unwrap();
 
     let msg = EnclaveRequest::Print("Hello from the host!".to_string());
 
-    stream.send(msg).unwrap();
+    stream.send(msg).await.unwrap();
 
-    let msg = stream.recv().unwrap();
+    let msg = stream.recv().await.unwrap();
     match msg {
         EnclaveResponse::Print(msg) => {
             println!("Received message: {}", msg);

@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
 
-mod vsock;
-pub use vsock::{VsockStream, CommunicationError};
+mod communication;
+pub use communication::{VsockStream, CommunicationError};
 
 /// A message sent between the enclave and the host.
 /// 

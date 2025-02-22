@@ -1,4 +1,3 @@
-use vsock::{VsockListener, VMADDR_CID_ANY, VsockStream as VsockStreamRaw};
 use sp1_tee_common::{EnclaveMessage, VsockStream};
 
 fn main() {

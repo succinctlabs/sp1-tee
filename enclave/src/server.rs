@@ -4,11 +4,10 @@ use k256::ecdsa::SigningKey;
 use rand_core::OsRng;
 use vsock::{VsockListener, VsockStream as VsockStreamRaw, VMADDR_CID_ANY};
 
-use std::io::{BufReader, Read};
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex};
 
-use sp1_tee_common::{EnclaveMessage, VsockStream, CommunicationError};
+use sp1_tee_common::{EnclaveMessage, VsockStream};
 
 const ALLOCATED_CPUS: usize = 4;
 

@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-clap = { version = "4.5.30", features = ["derive"] }
+clap = { workspace = true }
 
 # Protocol deps.
 k256 = "0.13.4"

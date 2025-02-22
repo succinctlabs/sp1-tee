@@ -22,14 +22,21 @@ pub struct EnclaveArgs {
 }
 
 fn main() {
-    let args = EnclaveArgs::parse();
-
     // Initialize the Nitro Enclaves SDK.
     unsafe { ffi::aws_nitro_enclaves_library_init(std::ptr::null_mut()); }
 
-    // Initialize the server.
-    let server = server::Server::new(args);
+    std::panic::catch_unwind(|| {
+        let args = EnclaveArgs::parse();
 
-    // Run the server, indefinitely.
-    server.run();
+        // // Initialize the server.
+        // let server = server::Server::new(args);
+
+        // // Run the server, indefinitely.
+        // server.run();
+    }).unwrap_or_else(|e| {
+        eprintln!("Panic: {:?}", e);
+    });
+    
+    // Loop forever so we can see logs if it panics.
+    loop {}
 }

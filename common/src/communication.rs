@@ -163,13 +163,12 @@ impl<In, Out> EnclaveStream<In, Out>
 
 #[derive(Debug, thiserror::Error)]
 pub enum CommunicationError {
+    #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-    Bincode(#[from] bincode::Error),
-    MessageTooLarge,
-}
 
-impl std::fmt::Display for CommunicationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
+    #[error("Bincode error: {0}")]
+    Bincode(#[from] bincode::Error),
+
+    #[error("Enclave message too large")]
+    MessageTooLarge,
 }

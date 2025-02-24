@@ -20,20 +20,28 @@ async fn main() {
     // Accept connections from any CID, on port `VSOCK_PORT`.
     let mut stream = EnclaveStream::connect(cid.unwrap_or(10), port.unwrap_or(5005)).await.unwrap();
 
-    let msg = EnclaveRequest::Print("Hello from the host!".to_string());
+    let print = EnclaveRequest::Print("Hello from the host!".to_string());
+    let get_public_key = EnclaveRequest::GetPublicKey;
+    let attest_signing_key = EnclaveRequest::AttestSigningKey;
 
-    stream.send(msg).await.unwrap();
+    stream.send(print).await.unwrap();
+    stream.send(get_public_key).await.unwrap();
+    stream.send(attest_signing_key).await.unwrap();
 
-    let msg = stream.recv().await.unwrap();
-    match msg {
-        EnclaveResponse::Print(msg) => {
-            println!("Received message: {}", msg);
-        }
-        EnclaveResponse::Ack => {
-            println!("Received Ack");
-        }
-        _ => {
-            panic!("Received unexpected message: {:?}", msg.type_of());
+    while let Ok(msg) = stream.recv().await {
+        match msg {
+            EnclaveResponse::Ack => {
+                println!("Received Ack");
+            },
+            EnclaveResponse::PublicKey(public_key) => {
+                println!("Received public key: {:?}", public_key);
+            },
+            EnclaveResponse::SigningKeyAttestation(attestation) => {
+                println!("Received attestation: {:?}", attestation);
+            },
+            _ => {
+                println!("Received unexpected message: {:?}", msg.type_of());
+            }
         }
     }
 }

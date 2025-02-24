@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 clap = { workspace = true }
+thiserror = { workspace = true }
 parking_lot = "0.12.3"
 rand_core = "0.6"
 
@@ -13,12 +14,15 @@ k256 = { workspace = true }
 sp1-tee-common = { workspace = true }
 
 # executor
-sp1-core-executor = { workspace = true }
+# sp1-core-executor = { workspace = true }
 
 # Transport deps.
 tokio-vsock = { workspace = true }
 tokio = { workspace = true }
 libc = "0.2.170"
+
+# AWS Deps.
+aws-nitro-enclaves-nsm-api = "0.4.0"
 
 [build-dependencies]
 cmake = "0.1"

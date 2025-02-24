@@ -3,12 +3,18 @@ use crate::EnclaveArgs;
 use k256::ecdsa::SigningKey;
 use rand_core::OsRng;
 use tokio_vsock::{VsockListener, VsockStream as VsockStreamRaw, VMADDR_CID_ANY, VsockAddr};
-
+use sp1_tee_common::{EnclaveRequest, EnclaveResponse, EnclaveStream};
+use aws_nitro_enclaves_nsm_api::{
+    driver::{nsm_init, nsm_process_request, nsm_exit},
+    api::{Request, Response},
+};
+use parking_lot::Mutex;
 use std::sync::Arc;
 
-use parking_lot::Mutex;
-
-use sp1_tee_common::{EnclaveRequest, EnclaveResponse, EnclaveStream};
+enum ConnectionState {
+    Continue,
+    Close,
+}
 
 pub struct Server {
     /// The arguments passed to the enclave at startup.
@@ -28,6 +34,8 @@ pub struct Server {
 impl Server {
     pub fn new(args: EnclaveArgs) -> Self {
         let signing_key = SigningKey::random(&mut OsRng);
+
+        println!("Server started with public key: {:?}", signing_key.verifying_key());
 
         Self {
             signing_key: Mutex::new(signing_key),
@@ -59,11 +67,25 @@ impl Server {
         }
     }
 
-    pub fn handle_connection(&self, stream: VsockStreamRaw) {
+    fn handle_connection(&self, stream: VsockStreamRaw) {
         let mut stream = EnclaveStream::<EnclaveRequest, EnclaveResponse>::new(stream);
 
-        let message = stream.blocking_recv().unwrap();
+        loop {
+            let message = stream.blocking_recv().unwrap();
 
+            match self.handle_message(message, &mut stream) {
+                ConnectionState::Continue => {}
+                ConnectionState::Close => {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Handles a message from the host.
+    /// 
+    /// Returns false if the connection should be closed.
+    fn handle_message(&self, message: EnclaveRequest, stream: &mut EnclaveStream<EnclaveRequest, EnclaveResponse>) -> ConnectionState {
         match message {
             EnclaveRequest::Print(message) => {
                 println!("{}", message);
@@ -71,9 +93,14 @@ impl Server {
                 stream.blocking_send(EnclaveResponse::Ack).unwrap();
             },
             EnclaveRequest::AttestSigningKey => {
-                let attestation = self.attest_signing_key();
-
-                stream.blocking_send(EnclaveResponse::SigningKeyAttestation(attestation)).unwrap();
+                match self.attest_signing_key() {
+                    Ok(attestation) => {
+                        stream.blocking_send(EnclaveResponse::SigningKeyAttestation(attestation)).unwrap();
+                    },
+                    Err(e) => {
+                        stream.blocking_send(EnclaveResponse::Error(format!("Failed to attest to the signing key: {:?}", e))).unwrap();
+                    },
+                }
             },
             EnclaveRequest::GetEncryptedSigningKey => {
                 let ciphertext = self.get_signing_key();
@@ -85,34 +112,82 @@ impl Server {
 
                 stream.blocking_send(EnclaveResponse::Ack).unwrap();
             },
+            EnclaveRequest::GetPublicKey => {
+                let public_key = self.get_public_key();
+
+                stream.blocking_send(EnclaveResponse::PublicKey(public_key)).unwrap();
+            },
             EnclaveRequest::Execute { stdin, program } => {
                 let _res = self.execute(stdin, program);
             },
+            EnclaveRequest::CloseSession => {
+                return ConnectionState::Close;
+            },
         }
+
+        ConnectionState::Continue
     }
 
     /// Decrypts the signing key (using KMS) and sets it on the server.
-    pub fn set_signing_key(&self, ciphertext: Vec<u8>) {
+    fn set_signing_key(&self, ciphertext: Vec<u8>) {
         todo!()
     }
 
     /// Encrypts the servers signing key (using KMS) and sends it to the host.
-    pub fn get_signing_key(&self) -> Vec<u8> {
+    fn get_signing_key(&self) -> Vec<u8> {
         todo!()
+    }
+
+    fn get_public_key(&self) -> k256::EncodedPoint {
+        self.signing_key.lock().verifying_key().to_encoded_point(false)
     }
     
     /// Attests to the signing key.
-    pub fn attest_signing_key(&self) -> Vec<u8> {
-        todo!()
+    fn attest_signing_key(&self) -> Result<Vec<u8>, ServerError> {
+        let fd = nsm_init();
+
+        if fd < 0 {
+            return Err(ServerError::FailedToInitNSM);
+        }
+
+        let public_key_bytes = self.signing_key.lock().verifying_key().to_sec1_bytes().into_vec();
+
+        println!("Public key bytes: {:?}", public_key_bytes);
+
+        let request = Request::Attestation {
+            user_data: None,
+            nonce: None,
+            public_key: Some(public_key_bytes.into()),
+        };
+
+        let response = nsm_process_request(fd, request);
+
+        nsm_exit(fd);
+
+        match response {
+            Response::Attestation { document, .. } => {
+                Ok(document)
+            },
+            _ => Err(ServerError::UnexpectedResponseType),
+        }
     }
 
     /// Executes a program with the given stdin and program.
     /// 
     /// Sends a signature over the public values (and the vkey) to the host.
-    pub fn execute(&self, stdin: Vec<u8>, program: Vec<u8>) {
+    fn execute(&self, stdin: Vec<u8>, program: Vec<u8>) {
         // Take the guard to ensure only one execution can be running at a time.
         let _guard = self.execution_guard.lock();
 
         todo!()
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+enum ServerError {
+    #[error("Failed to initialize NSM")]
+    FailedToInitNSM,
+
+    #[error("Unexpected response type from NSM, this is a bug.")]
+    UnexpectedResponseType,
 }

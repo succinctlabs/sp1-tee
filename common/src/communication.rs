@@ -3,12 +3,12 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use std::io::{Read, Write};
 use serde::{Serialize, de::DeserializeOwned};
 
-pub struct EnclaveStream<In, Out> {
+pub struct VsockStream<In, Out> {
     stream: VsockStreamRaw,
     _marker: std::marker::PhantomData<(In, Out)>,
 }
 
-impl<In, Out> EnclaveStream<In, Out> {
+impl<In, Out> VsockStream<In, Out> {
     pub fn new(stream: VsockStreamRaw) -> Self {
         Self { stream, _marker: std::marker::PhantomData }
     }
@@ -22,7 +22,7 @@ impl<In, Out> EnclaveStream<In, Out> {
 }
 
 /// Blocking methods.
-impl<In, Out> EnclaveStream<In, Out> 
+impl<In, Out> VsockStream<In, Out> 
     where 
         In: DeserializeOwned,
         Out: Serialize,
@@ -105,7 +105,7 @@ impl<In, Out> EnclaveStream<In, Out>
 }
 
 /// Async methods.
-impl<In, Out> EnclaveStream<In, Out>
+impl<In, Out> VsockStream<In, Out>
     where
         In: DeserializeOwned,
         Out: Serialize,

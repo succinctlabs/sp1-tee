@@ -20,6 +20,7 @@ bincode = "1.3.3"
 thiserror = "1.0"
 clap = { version = "4.5.30", features = ["derive"] }
 k256 = { version = "0.13.4", features = ["serde"] }
+aws-nitro-enclaves-nsm-api = "0.4.0"
 
 # sp1
 sp1-core-executor = { version = "4.1.0" } 

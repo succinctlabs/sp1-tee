@@ -16,3 +16,7 @@ sp1-tee-common = { workspace = true }
 tokio-vsock = { workspace = true }
 clap = { workspace = true }
 tokio = { workspace = true }
+
+# Attestation Helpers
+aws-nitro-enclaves-cose = { git = "https://github.com/nhtyy/aws-nitro-enclaves-cose.git", branch = "main" }
+aws-nitro-enclaves-nsm-api = { workspace = true }

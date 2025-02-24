@@ -3,7 +3,7 @@ use crate::EnclaveArgs;
 use k256::ecdsa::SigningKey;
 use rand_core::OsRng;
 use tokio_vsock::{VsockListener, VsockStream as VsockStreamRaw, VMADDR_CID_ANY, VsockAddr};
-use sp1_tee_common::{EnclaveRequest, EnclaveResponse, EnclaveStream};
+use sp1_tee_common::{EnclaveRequest, EnclaveResponse, VsockStream};
 use aws_nitro_enclaves_nsm_api::{
     driver::{nsm_init, nsm_process_request, nsm_exit},
     api::{Request, Response},
@@ -68,7 +68,7 @@ impl Server {
     }
 
     fn handle_connection(&self, stream: VsockStreamRaw) {
-        let mut stream = EnclaveStream::<EnclaveRequest, EnclaveResponse>::new(stream);
+        let mut stream = VsockStream::<EnclaveRequest, EnclaveResponse>::new(stream);
 
         loop {
             let message = stream.blocking_recv().unwrap();
@@ -76,6 +76,7 @@ impl Server {
             match self.handle_message(message, &mut stream) {
                 ConnectionState::Continue => {}
                 ConnectionState::Close => {
+                    println!("Connection closed.");
                     break;
                 }
             }
@@ -85,7 +86,7 @@ impl Server {
     /// Handles a message from the host.
     /// 
     /// Returns false if the connection should be closed.
-    fn handle_message(&self, message: EnclaveRequest, stream: &mut EnclaveStream<EnclaveRequest, EnclaveResponse>) -> ConnectionState {
+    fn handle_message(&self, message: EnclaveRequest, stream: &mut VsockStream<EnclaveRequest, EnclaveResponse>) -> ConnectionState {
         match message {
             EnclaveRequest::Print(message) => {
                 println!("{}", message);
@@ -139,7 +140,7 @@ impl Server {
     }
 
     fn get_public_key(&self) -> k256::EncodedPoint {
-        self.signing_key.lock().verifying_key().to_encoded_point(false)
+        self.signing_key.lock().verifying_key().to_encoded_point(true)
     }
     
     /// Attests to the signing key.
@@ -150,7 +151,9 @@ impl Server {
             return Err(ServerError::FailedToInitNSM);
         }
 
-        let public_key_bytes = self.signing_key.lock().verifying_key().to_sec1_bytes().into_vec();
+        // SEC1 encoded public key.
+        // Explicitly use compression as only the X-coordinate is used in the contract.
+        let public_key_bytes = self.get_public_key().to_bytes().to_vec();
 
         println!("Public key bytes: {:?}", public_key_bytes);
 

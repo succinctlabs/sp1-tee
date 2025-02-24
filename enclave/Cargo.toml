@@ -22,7 +22,7 @@ tokio = { workspace = true }
 libc = "0.2.170"
 
 # AWS Deps.
-aws-nitro-enclaves-nsm-api = "0.4.0"
+aws-nitro-enclaves-nsm-api = { workspace = true }
 
 [build-dependencies]
 cmake = "0.1"

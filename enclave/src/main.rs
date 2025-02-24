@@ -1,7 +1,6 @@
 use clap::Parser;
 
 pub mod server;
-pub mod executor;
 
 #[allow(unused)]
 pub mod ffi;

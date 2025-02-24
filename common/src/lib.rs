@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
 
 mod communication;
-pub use communication::{EnclaveStream, CommunicationError};
+pub use communication::{VsockStream, CommunicationError};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum EnclaveRequest {

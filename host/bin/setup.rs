@@ -144,9 +144,39 @@ async fn main() {
     ///////////////////////////////
     // Add the signers
     ///////////////////////////////
-    
-    // Loop over the address in the s3 bucket (and probably verify the attestations),
-    // and add them to the contracts.
+
+    let s3_client = sp1_tee_host::s3_client().await;
+
+    let attestations = s3_client
+        .list_objects_v2()
+        .bucket(sp1_tee_host::S3_BUCKET.to_string())
+        .send()
+        .await
+        .expect("Failed to list attestations");
+
+    for metadata in &attestations
+        .contents
+        .expect("No contents found in attestations")
+    {
+        let key = metadata.key.clone().expect("No key found in attestations");
+
+        let key_as_address = key.parse::<Address>().expect("Failed to parse key as address");
+
+        println!("Adding signer: {}", key_as_address);
+
+        // Fetch the actual object from S3.
+        let object = s3_client
+            .get_object()
+            .bucket(sp1_tee_host::S3_BUCKET.to_string())
+            .key(key)
+            .send()
+            .await
+            .expect("Failed to get object");
+
+        let bytes = object.body.collect().await.expect("Failed to collect object body").to_vec();
+
+        let _attestation = bytes;
+    }
 
     // todo!()
 
@@ -190,6 +220,6 @@ fn anvil_deploy_args(cmd: &mut Command, args: &Args) {
         &args.rpc_url,
         "--broadcast",
         "--code-size-limit",
-        "40000"
+        "40000",
     ]);
 }

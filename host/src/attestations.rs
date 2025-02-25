@@ -1,9 +1,11 @@
-use aws_config::{BehaviorVersion, Region};
+use attestation_doc_validation::error::AttestResult;
 use aws_sdk_s3::{error::SdkError, operation::put_object::PutObjectError};
-use sp1_tee_common::{CommunicationError, EnclaveRequest, EnclaveResponse, VsockStream};
-use crate::HostStream;
+use sp1_tee_common::{CommunicationError, EnclaveRequest, EnclaveResponse};
+
+use aws_nitro_enclaves_nsm_api::api::AttestationDoc;
 
 use crate::ethereum_address_from_encoded_point;
+use crate::{s3_client, HostStream};
 
 #[derive(Debug)]
 pub struct SaveAttestationArgs {
@@ -22,10 +24,7 @@ impl Default for SaveAttestationArgs {
         Self {
             cid: 10,
             port: 5005,
-            #[cfg(feature = "production")]
-            bucket: "sp1-tee-attestations".to_string(),
-            #[cfg(not(feature = "production"))]
-            bucket: "sp1-tee-attestations-testing".to_string(),
+            bucket: crate::S3_BUCKET.to_string(),
         }
     }
 }
@@ -53,15 +52,7 @@ pub async fn save_attestation(args: SaveAttestationArgs) -> Result<(), SaveAttes
 
     let SaveAttestationArgs { cid, port, bucket } = args;
 
-    // Loads from environment variables.
-    let aws_config = aws_config::defaults(BehaviorVersion::latest())
-        // buckets are in us-east-1
-        .region(Region::new("us-east-1"))
-        .load()
-        .await;
-
-    // Create the S3 client.
-    let s3_client = aws_sdk_s3::Client::new(&aws_config);
+    let s3_client = s3_client().await;
 
     // Connect to the enclave.
     let mut stream = HostStream::new(cid, port).await?;
@@ -74,25 +65,22 @@ pub async fn save_attestation(args: SaveAttestationArgs) -> Result<(), SaveAttes
     stream.send(get_public_key).await?;
 
     let attestation = match stream.recv().await? {
-        EnclaveResponse::SigningKeyAttestation(attestation) => {
-            attestation
-        }
+        EnclaveResponse::SigningKeyAttestation(attestation) => attestation,
         msg => {
             return Err(SaveAttestationError::UnexpectedMessage(msg.type_of()));
         }
     };
 
     let public_key = match stream.recv().await? {
-        EnclaveResponse::PublicKey(public_key) => {
-            public_key
-        }
+        EnclaveResponse::PublicKey(public_key) => public_key,
         msg => {
             return Err(SaveAttestationError::UnexpectedMessage(msg.type_of()));
         }
     };
 
     // The address of the enclave is the S3 bucket key.
-    let key = ethereum_address_from_encoded_point(&public_key).ok_or(SaveAttestationError::BadPublicKey)?;
+    let key = ethereum_address_from_encoded_point(&public_key)
+        .ok_or(SaveAttestationError::BadPublicKey)?;
     let key = key.to_string();
 
     // Write the attestation to S3.
@@ -105,4 +93,15 @@ pub async fn save_attestation(args: SaveAttestationArgs) -> Result<(), SaveAttes
         .await?;
 
     Ok(())
+}
+
+/// Verifies an attestation, this should be the COSESign1 attestation from the enclave.
+///
+/// This function will:
+/// - Decode the COSESign1 structure.
+/// - Validate all CA certs against the root of trust
+/// - Verify the signature of the payload
+/// - Return the payload as a [`AttestationDocument`]
+pub fn verify_attestation(attestation: &[u8]) -> AttestResult<AttestationDoc> { 
+    attestation_doc_validation::validate_and_parse_attestation_doc(attestation)
 }

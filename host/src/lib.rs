@@ -1,8 +1,15 @@
 use alloy::primitives::Address;
+use aws_config::{BehaviorVersion, Region};
 use sp1_tee_common::{CommunicationError, EnclaveRequest, EnclaveResponse, VsockStream};
 
-mod attestations;
+pub mod attestations;
 pub use attestations::{save_attestation, SaveAttestationArgs, SaveAttestationError};
+
+#[cfg(feature = "production")]
+pub const S3_BUCKET: &str = "sp1-tee-attestations";
+
+#[cfg(not(feature = "production"))]
+pub const S3_BUCKET: &str = "sp1-tee-attestations-testing";
 
 /// A wrapper around [`VsockStream`] that allows for sending messages to the enclave.
 ///
@@ -41,8 +48,7 @@ impl Drop for HostStream {
 
 /// Converts a K256 encoded point to an Ethereum address.
 /// 
-/// Returns `None` if the point is the identity, compact or compressed, as we need the full public key
-/// of the form [ x || y] to compute the address correctly.
+/// Ethereum address are derived as `keccack256([x || y])[12..]`
 pub fn ethereum_address_from_encoded_point(encoded_point: &k256::EncodedPoint) -> Option<Address> {
     if encoded_point.is_identity() || encoded_point.is_compact() || encoded_point.is_compressed() {
         return None;
@@ -50,4 +56,16 @@ pub fn ethereum_address_from_encoded_point(encoded_point: &k256::EncodedPoint) -
 
     // Note: The leading 0x04 is an indentifier, and should be skipped for the hashing.
     Some(Address::from_raw_public_key(&encoded_point.as_bytes()[1..]))
+}
+
+pub async fn s3_client() -> aws_sdk_s3::Client {
+    // Loads from environment variables.
+    let aws_config = aws_config::defaults(BehaviorVersion::latest())
+        // buckets are in us-east-1
+        .region(Region::new("us-east-1"))
+        .load()
+        .await;
+
+    // Create the S3 client.
+    aws_sdk_s3::Client::new(&aws_config)
 }

@@ -32,7 +32,8 @@ sudo yum install -y \
 	gcc-c++ \
 	go \
 	ninja-build \
-	doxygen
+	doxygen \
+	openssl-devel
 
 # Install the rust toolchain.
 curl https://sh.rustup.rs -sSf | sh -s -- -y

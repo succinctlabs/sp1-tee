@@ -17,9 +17,9 @@ description = "Deploys the contracts, adds PCRs and registers the signer."
 path = "bin/setup.rs"
 
 [[bin]]
-name = "get_attestation_doc"
+name = "save_attestation"
 description = "Gets the attestation doc from the enclave, and prints it as a JSON object."
-path = "bin/get_attestation.rs"
+path = "bin/save_attestation.rs"
 
 [dependencies]
 sp1-tee-common = { workspace = true }
@@ -28,8 +28,13 @@ clap = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 alloy = { version = "0.11.1", features = ["full", "signer-ledger"] }
+thiserror = { workspace = true }
 
 # Attestation Helpers
 aws-nitro-enclaves-cose = { git = "https://github.com/nhtyy/aws-nitro-enclaves-cose.git", branch = "main" }
 aws-nitro-enclaves-nsm-api = { workspace = true }
 serde_json = "1.0.139"
+aws-config = "1.5.17"
+aws-sdk-s3 = "1.77.0"
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"

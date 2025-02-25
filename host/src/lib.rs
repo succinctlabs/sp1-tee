@@ -1,5 +1,8 @@
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse, VsockStream, CommunicationError};
 
+mod attestations;
+pub use attestations::{SaveAttestationArgs, SaveAttestationError, save_attestation};
+
 /// A wrapper around [`VsockStream`] that allows for sending messages to the enclave.
 /// 
 /// This stream is bi-directional, and it will automatically close the connection when the stream is dropped.

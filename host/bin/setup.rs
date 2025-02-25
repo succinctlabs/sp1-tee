@@ -2,12 +2,9 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use alloy::network::EthereumWallet;
-use alloy::primitives::{keccak256, Address};
+use alloy::primitives::Address;
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::signers::local::PrivateKeySigner;
-use aws_nitro_enclaves_cose::sign::SigStructure;
-use aws_nitro_enclaves_cose::CoseSign1;
-use aws_nitro_enclaves_nsm_api::api::AttestationDoc;
 use serde::Deserialize;
 
 use clap::Parser;
@@ -47,17 +44,10 @@ struct Args {
     /// The etherscan URL to use.
     #[clap(long)]
     etherscan_url: Option<String>,
-
-    /// The path to the attestation document.
-    #[clap(long)]
-    cose_doc_path: PathBuf,
 }
 
 #[derive(Debug, Deserialize)]
 struct Deployment {
-    #[serde(rename = "CertManager")]
-    cert_manager: Address,
-
     #[serde(rename = "SP1TeeVerifier")]
     sp1_tee_verifier: Address,
 }
@@ -75,19 +65,9 @@ alloy::sol! {
         /// @dev Only the owner or the manager can add a signer.
         function addSigner(bytes memory attestationTbs, bytes memory signature) external;
     }
-
-    #[sol(rpc)]
-    contract _CertManager {
-        function verified(bytes32 certHash) external view returns (bytes);
-
-        function verifyCACert(bytes memory cert, bytes32 parentCertHash) external;
-
-        function verifyClientCert(bytes memory cert, bytes32 parentCertHash) external;
-    }
 }
 
 type TEEVerifier<P, N> = _TEEVerifier::_TEEVerifierInstance<(), P, N>;
-type CertManager<P, N> = _CertManager::_CertManagerInstance<(), P, N>;
 
 #[tokio::main]
 async fn main() {
@@ -162,107 +142,16 @@ async fn main() {
     )
     .expect("Failed to parse deployment.json");
 
-    println!("Setting up the contracts...");
-
     ///////////////////////////////
-    // Verify CA certs.
-    ///////////////////////////////
-
-    // Read the attestation doc from the path.
-    let cose_doc = std::fs::read(args.cose_doc_path).expect("Failed to read attestation doc");
-    let cose_doc = CoseSign1::from_bytes(&cose_doc).expect("Failed to parse COSE doc");
-    let attestation_doc = AttestationDoc::from_binary(&cose_doc.payload).expect("Failed to parse attestation document");
-
-    // Add the CA certs to the cert manager.
-    let cert_manager = CertManager::new(deployment.cert_manager, &provider);
-
-    // The root of trust is self signed, so we can just use the first CA in the bundle.
-    let mut parent_cert_hash = keccak256(attestation_doc.cabundle[0].clone());
-    for ca in attestation_doc.cabundle {
-        // Dont verify a cert twice.
-        if cert_manager
-            .verified(keccak256(&ca))
-            .call()
-            .await
-            .expect("Failed to check if CA cert is verified")
-            ._0
-            .len() > 0
-        {
-            println!("CA cert already verified: {}", keccak256(&ca));
-            continue;
-        }
-
-        // Hash the cert, this is the next parent cert hash.
-        let hash = keccak256(&ca);
-
-        // Submit the TX to verify the CA cert.
-        let _ = cert_manager
-            .verifyCACert(ca.into_vec().into(), parent_cert_hash)
-            .send()
-            .await
-            .expect("Failed to verify CA cert")
-            .watch()
-            .await
-            .expect("Failed to get tx hash while verifying CA cert");
-
-        parent_cert_hash = hash;
-    }
-    println!("All CA certs verified.");
-
-    ///////////////////////////////
-    // Verify client cert.
-    ///////////////////////////////
-
-    // Add the client certs to the cert manager.
-    let _ = cert_manager
-        .verifyClientCert(attestation_doc.certificate.into_vec().into(), parent_cert_hash)
-        .send()
-        .await
-        .expect("Failed to verify client cert")
-        .watch()
-        .await
-        .expect("Failed to get tx hash while verifying client cert");
-
-    println!("Client cert verified.");
-
-    ///////////////////////////////
-    // Set the valid PCR0s.
-    ///////////////////////////////
-
-    // Finally, we can set the valid PCR0s.
-    let tee_verifier = TEEVerifier::new(deployment.sp1_tee_verifier, &provider);
-
-    // todo(n) check if the PCR0 is already set!.
-
-    let _ = tee_verifier
-        .setValidPCR0(attestation_doc.pcrs.get(&0).expect("Failed to get PCR0").clone().into_vec().into())
-        .send()
-        .await
-        .expect("Failed to set valid PCR0")
-        .watch()
-        .await;
-
-    println!("Valid PCR0 set.");
-
-    ///////////////////////////////
-    // Register the signer.
+    // Add the signers
     ///////////////////////////////
     
-    let (payload, protected) = (cose_doc.payload.clone().into_vec(), cose_doc.protected.clone().to_vec());
+
+    println!("Adding PCRs to the contracts...");
     
-    let sig_struct = SigStructure::new_sign1(&protected, &payload).unwrap();
+    
 
-    // todo(n) check if the signer is already registered!.
-
-    let _ = tee_verifier.addSigner(sig_struct.as_bytes().unwrap().into(), cose_doc.signature.into_vec().into())
-        .send()
-        .await
-        .expect("Failed to register signer")
-        .watch()
-        .await;
-
-    println!("Signer registered.");
-    println!("Setup complete, dont forget to change the owner and manager of the contracts!");
+    println!("Setup complete.");
 }
 
 fn unwrap_or_env(value: &Option<String>, env_var: &str) -> String {

@@ -13,13 +13,18 @@ path = "bin/vsock_test.rs"
 
 [[bin]]
 name = "sp1-tee-setup"
-description = "Deploys the contracts, adds PCRs and registers the signer."
+description = "Deploys the contracts, validates the attestations and adds the signers to the contracts."
 path = "bin/setup.rs"
 
 [[bin]]
 name = "save_attestation"
-description = "Gets the attestation doc from the enclave, and prints it as a JSON object."
+description = "Saves the attestation doc to S3, mostly used for testing."
 path = "bin/save_attestation.rs"
+
+[[bin]]
+name = "validate_attestations"
+description = "Builds the docker image locally, requires nitro-cli, validates the signer attestations against the S3 registry."
+path = "bin/validate_attestations.rs"
 
 [dependencies]
 sp1-tee-common = { workspace = true }
@@ -27,8 +32,10 @@ tokio-vsock = { workspace = true }
 clap = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
-alloy = { version = "0.11.1", features = ["full", "signer-ledger"] }
 thiserror = { workspace = true }
+k256 = { workspace = true }
+
+alloy = { version = "0.11.1", features = ["full", "signer-ledger"] }
 
 # Attestation Helpers
 aws-nitro-enclaves-cose = { git = "https://github.com/nhtyy/aws-nitro-enclaves-cose.git", branch = "main" }
@@ -38,3 +45,6 @@ aws-config = "1.5.17"
 aws-sdk-s3 = "1.77.0"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
+
+[features]
+production = []

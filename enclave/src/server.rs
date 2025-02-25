@@ -103,16 +103,6 @@ impl Server {
                     },
                 }
             },
-            EnclaveRequest::GetEncryptedSigningKey => {
-                let ciphertext = self.get_signing_key();
-
-                stream.blocking_send(EnclaveResponse::EncryptedSigningKey(ciphertext)).unwrap();
-            },
-            EnclaveRequest::SetSigningKey(ciphertext) => {
-                self.set_signing_key(ciphertext);
-
-                stream.blocking_send(EnclaveResponse::Ack).unwrap();
-            },
             EnclaveRequest::GetPublicKey => {
                 let public_key = self.get_public_key();
 
@@ -124,23 +114,31 @@ impl Server {
             EnclaveRequest::CloseSession => {
                 return ConnectionState::Close;
             },
+            EnclaveRequest::GetEncryptedSigningKey => {
+                stream.blocking_send(EnclaveResponse::Error("Not implemented".to_string())).unwrap();
+            },
+            EnclaveRequest::SetSigningKey(_) => {
+                stream.blocking_send(EnclaveResponse::Error("Not implemented".to_string())).unwrap();
+            },
         }
 
         ConnectionState::Continue
     }
 
     /// Decrypts the signing key (using KMS) and sets it on the server.
+    #[allow(unused)]
     fn set_signing_key(&self, ciphertext: Vec<u8>) {
         todo!()
     }
 
     /// Encrypts the servers signing key (using KMS) and sends it to the host.
+    #[allow(unused)]
     fn get_signing_key(&self) -> Vec<u8> {
         todo!()
     }
 
     fn get_public_key(&self) -> k256::EncodedPoint {
-        self.signing_key.lock().verifying_key().to_encoded_point(true)
+        self.signing_key.lock().verifying_key().to_encoded_point(false)
     }
     
     /// Attests to the signing key.
@@ -154,8 +152,6 @@ impl Server {
         // SEC1 encoded public key.
         // Explicitly use compression as only the X-coordinate is used in the contract.
         let public_key_bytes = self.get_public_key().to_bytes().to_vec();
-
-        println!("Public key bytes: {:?}", public_key_bytes);
 
         let request = Request::Attestation {
             user_data: None,

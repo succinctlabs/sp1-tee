@@ -1,6 +1,9 @@
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::{error::SdkError, operation::put_object::PutObjectError};
 use sp1_tee_common::{CommunicationError, EnclaveRequest, EnclaveResponse, VsockStream};
+use crate::HostStream;
+
+use crate::ethereum_address_from_encoded_point;
 
 #[derive(Debug)]
 pub struct SaveAttestationArgs {
@@ -19,7 +22,10 @@ impl Default for SaveAttestationArgs {
         Self {
             cid: 10,
             port: 5005,
+            #[cfg(feature = "production")]
             bucket: "sp1-tee-attestations".to_string(),
+            #[cfg(not(feature = "production"))]
+            bucket: "sp1-tee-attestations-testing".to_string(),
         }
     }
 }
@@ -32,20 +38,24 @@ pub enum SaveAttestationError {
     #[error("Failed to put object: {0}")]
     S3PutObjectError(#[from] SdkError<PutObjectError>),
 
+    #[error("Got a bad public key from the enclave, this is a bug.")]
+    BadPublicKey,
+
     #[error("Unexpected message from enclave, expected signing key attestation, got {0}")]
     UnexpectedMessage(&'static str),
 }
 
+/// Save the attestation to S3.
+///
+/// This function will connect to the enclave, request the signing key attestation, and save it to S3.
 pub async fn save_attestation(args: SaveAttestationArgs) -> Result<(), SaveAttestationError> {
     tracing::debug!("Save attestation args: {:#?}", args);
 
     let SaveAttestationArgs { cid, port, bucket } = args;
 
-    // Save the attestation to S3, with the key being the host name and the CID.
-    let key = format!("{}-{}", host_name(), cid);
-
     // Loads from environment variables.
     let aws_config = aws_config::defaults(BehaviorVersion::latest())
+        // buckets are in us-east-1
         .region(Region::new("us-east-1"))
         .load()
         .await;
@@ -53,51 +63,46 @@ pub async fn save_attestation(args: SaveAttestationArgs) -> Result<(), SaveAttes
     // Create the S3 client.
     let s3_client = aws_sdk_s3::Client::new(&aws_config);
 
-    // Accept connections from any CID, on port `VSOCK_PORT`.
-    let mut stream = VsockStream::connect(cid, port).await.unwrap();
+    // Connect to the enclave.
+    let mut stream = HostStream::new(cid, port).await?;
 
+    // Request the signing key attestation.
     let attest_signing_key = EnclaveRequest::AttestSigningKey;
+    let get_public_key = EnclaveRequest::GetPublicKey;
 
     stream.send(attest_signing_key).await?;
+    stream.send(get_public_key).await?;
 
-    match stream.recv().await? {
+    let attestation = match stream.recv().await? {
         EnclaveResponse::SigningKeyAttestation(attestation) => {
-            s3_client
-                .put_object()
-                .bucket(bucket)
-                .key(key)
-                .body(attestation.into())
-                .send()
-                .await?;
+            attestation
         }
         msg => {
             return Err(SaveAttestationError::UnexpectedMessage(msg.type_of()));
         }
-    }
+    };
+
+    let public_key = match stream.recv().await? {
+        EnclaveResponse::PublicKey(public_key) => {
+            public_key
+        }
+        msg => {
+            return Err(SaveAttestationError::UnexpectedMessage(msg.type_of()));
+        }
+    };
+
+    // The address of the enclave is the S3 bucket key.
+    let key = ethereum_address_from_encoded_point(&public_key).ok_or(SaveAttestationError::BadPublicKey)?;
+    let key = key.to_string();
+
+    // Write the attestation to S3.
+    s3_client
+        .put_object()
+        .bucket(bucket)
+        .key(key)
+        .body(attestation.into())
+        .send()
+        .await?;
 
     Ok(())
-}
-
-fn host_name() -> String {
-    let raw = std::process::Command::new("hostname")
-        .output()
-        .unwrap()
-        .stdout;
-
-    String::from_utf8(raw).unwrap()
-}
-
-fn get_region() -> Region {
-    let raw = std::process::Command::new("ec2-metadata")
-        .arg("--region")
-        .output()
-        .unwrap()
-        .stdout;
-
-    let region_output_raw = String::from_utf8(raw).unwrap();
-
-    // Remove the "region: " prefix.
-    let region = region_output_raw.replace("region: ", "");
-
-    Region::new(region.trim().to_string())
 }

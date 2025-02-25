@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::process::Command;
 
 use alloy::network::EthereumWallet;
@@ -146,10 +145,10 @@ async fn main() {
     // Add the signers
     ///////////////////////////////
     
+    // Loop over the address in the s3 bucket (and probably verify the attestations),
+    // and add them to the contracts.
 
-    println!("Adding PCRs to the contracts...");
-    
-    
+    // todo!()
 
     println!("Setup complete.");
 }

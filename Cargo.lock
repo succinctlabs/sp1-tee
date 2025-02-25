@@ -4281,6 +4281,7 @@ dependencies = [
  "aws-nitro-enclaves-nsm-api",
  "aws-sdk-s3",
  "clap",
+ "k256",
  "serde",
  "serde_json",
  "sp1-tee-common",

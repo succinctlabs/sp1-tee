@@ -5,6 +5,7 @@ use alloy::network::EthereumWallet;
 use alloy::primitives::{keccak256, Address};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::signers::local::PrivateKeySigner;
+use aws_nitro_enclaves_cose::sign::SigStructure;
 use aws_nitro_enclaves_cose::CoseSign1;
 use aws_nitro_enclaves_nsm_api::api::AttestationDoc;
 use serde::Deserialize;
@@ -12,7 +13,7 @@ use serde::Deserialize;
 use clap::Parser;
 
 /// The folder containing the deployment (json) files.
-const DEPLOYMNET_FOLDER: &str = "../contracts/deployments";
+const DEPLOY_FOLDER: &str = "contracts/deployments";
 
 #[derive(Parser)]
 #[clap(about = "
@@ -77,7 +78,7 @@ alloy::sol! {
 
     #[sol(rpc)]
     contract _CertManager {
-        function verified(bytes32 certHash) external view returns (bool);
+        function verified(bytes32 certHash) external view returns (bytes);
 
         function verifyCACert(bytes memory cert, bytes32 parentCertHash) external;
 
@@ -121,7 +122,7 @@ async fn main() {
             .expect("Failed to parse SP1_VERIFIER_GATEWAY");
 
         let mut command = Command::new("forge");
-        command.current_dir("../contracts");
+        command.current_dir("contracts");
         command.env("SP1_VERIFIER_GATEWAY", gateway.to_string());
 
         // If the RPC url is anvil, we need to use the anvil deploy args
@@ -155,7 +156,7 @@ async fn main() {
         .expect("Failed to get chain id");
 
     // Load the deployment from the path.
-    let deployment_path = format!("{}/{}.json", DEPLOYMNET_FOLDER, chain_id);
+    let deployment_path = format!("{}/{}.json", DEPLOY_FOLDER, chain_id);
     let deployment: Deployment = serde_json::from_reader(
         std::fs::File::open(deployment_path).expect("Failed to open deployment.json"),
     )
@@ -185,6 +186,7 @@ async fn main() {
             .await
             .expect("Failed to check if CA cert is verified")
             ._0
+            .len() > 0
         {
             println!("CA cert already verified: {}", keccak256(&ca));
             continue;
@@ -230,6 +232,8 @@ async fn main() {
     // Finally, we can set the valid PCR0s.
     let tee_verifier = TEEVerifier::new(deployment.sp1_tee_verifier, &provider);
 
+    // todo(n) check if the PCR0 is already set!.
+
     let _ = tee_verifier
         .setValidPCR0(attestation_doc.pcrs.get(&0).expect("Failed to get PCR0").clone().into_vec().into())
         .send()
@@ -243,8 +247,14 @@ async fn main() {
     ///////////////////////////////
     // Register the signer.
     ///////////////////////////////
+    
+    let (payload, protected) = (cose_doc.payload.clone().into_vec(), cose_doc.protected.clone().to_vec());
+    
+    let sig_struct = SigStructure::new_sign1(&protected, &payload).unwrap();
 
-    let _ = tee_verifier.addSigner(cose_doc.payload.into_vec().into(), cose_doc.signature.into_vec().into())
+    // todo(n) check if the signer is already registered!.
+
+    let _ = tee_verifier.addSigner(sig_struct.as_bytes().unwrap().into(), cose_doc.signature.into_vec().into())
         .send()
         .await
         .expect("Failed to register signer")
@@ -291,5 +301,7 @@ fn anvil_deploy_args(cmd: &mut Command, args: &Args) {
         "--rpc-url",
         &args.rpc_url,
         "--broadcast",
+        "--code-size-limit",
+        "40000"
     ]);
 }

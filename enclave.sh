@@ -27,7 +27,7 @@ if [ $1 == "terminate" ]; then
 fi
 
 # Always build the enclave from scratch.
-if [ $2 == "-f" || $2 == "--debug" ]; then
+if [[ $2 == "-f" || $2 == "--debug" ]]; then
     docker build --build-arg DEBUG_MODE=1 -t sp1-tee .
 else
     docker build -t sp1-tee .

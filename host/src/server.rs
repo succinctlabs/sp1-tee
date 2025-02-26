@@ -60,8 +60,17 @@ impl Server {
     /// 
     /// This function will block and start the enclave and spawn a task to save attestations to S3.
     pub fn new(args: &ServerArgs) -> Arc<Self> {
+        #[cfg(feature = "production")]
+        {
+            if args.debug {
+                panic!("Debug mode is not allowed when the program is built for production.");
+            }
+        }
+        
+        // Blocking start the enclave.
         start_enclave(args);
 
+        // Spawn a task to save attestations to S3.
         spawn_attestation_task(args.enclave_cid, sp1_tee_common::ENCLAVE_PORT, crate::attestations::ATTESTATION_INTERVAL);
 
         Arc::new(Self {
@@ -101,6 +110,8 @@ pub struct ServerArgs {
 /// Start the enclave.
 /// 
 /// This function will block until the enclave is started or force the program to exit with an error code.
+/// 
+/// This function utilizes the `enclave.sh` script to start the enclave.
 pub fn start_enclave(args: &ServerArgs) {
     // Run the enclave.sh script.
     let mut command = std::process::Command::new("sh");
@@ -134,6 +145,11 @@ pub fn start_enclave(args: &ServerArgs) {
     );
 }
 
+/// Terminate the enclave.
+/// 
+/// This function will block until the enclave is terminated or force the program to exit with an error code.
+/// 
+/// This function utilizes the `enclave.sh` script to terminate the enclave.
 pub fn terminate_enclaves() {
      // Run the enclave.sh script.
     let mut command = std::process::Command::new("sh");

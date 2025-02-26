@@ -21,6 +21,7 @@ thiserror = "1.0"
 clap = { version = "4.5.30", features = ["derive"] }
 k256 = { version = "0.13.4", features = ["serde"] }
 aws-nitro-enclaves-nsm-api = "0.4.0"
+tracing = "0.1.41"
 
 # sp1
 sp1-sdk = "4.0.0"

@@ -6,13 +6,29 @@ use sp1_tee_host::{
     api::{TEERequest, TEEResponse},
     HostStream,
 };
+use tracing_subscriber::EnvFilter;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
+/// Initialize the tracing subscriber.
+/// 
+/// The default filter is `sp1-tee-server=debug,info`.
+fn init_tracing() {
+    let default_env_filter = EnvFilter::try_from_default_env().unwrap_or(
+        EnvFilter::from_str("sp1-tee-server=debug,info").expect("Failed to server default env filter")
+    );
+
+    tracing_subscriber::fmt()
+        .with_env_filter(default_env_filter)
+        .with_line_number(true)
+        .with_file(true)
+        .init();
+}
+
 #[tokio::main]
 async fn main() {
-    // todo: improve beyond default.
-    tracing_subscriber::fmt::init();
+    init_tracing();
 
     let args = ServerArgs::parse();
 
@@ -49,6 +65,7 @@ async fn main() {
 /// Execute a program on the enclave.
 ///
 /// In order to avoid OOM in the enclave, we run only one program at a time.
+#[tracing::instrument(skip_all)]
 async fn execute(
     State(server): State<Arc<Server>>,
     Json(request): Json<TEERequest>,
@@ -77,7 +94,8 @@ async fn execute(
 
     // Receive the response from the enclave.
     let response = stream.recv().await.map_err(|e| {
-        tracing::error!("Failed to receive response from enclave: {}", e);
+        tracing::error!("Failed to receive response from enclave: {:?}", e);
+
         ServerError::FailedToReceiveResponseFromEnclave
     })?;
 
@@ -97,11 +115,13 @@ async fn execute(
             }))
         }
         EnclaveResponse::Error(error) => {
-            tracing::error!("Error from enclave: {}", error);
+            tracing::error!("Error from enclave: {:?}", error);
+
             Err(ServerError::EnclaveError(error))
         }
         _ => {
             tracing::error!("Unexpected response from enclave: {:?}", response);
+
             Err(ServerError::UnexpectedResponseFromEnclave)
         }
     }

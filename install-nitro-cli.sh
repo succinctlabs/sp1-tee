@@ -16,4 +16,10 @@ sudo systemctl enable --now nitro-enclaves-allocator.service
 # Enable and start the docker service.
 sudo systemctl enable --now docker
 
+# Install the rust toolchain.
+curl https://sh.rustup.rs -sSf | sh -s -- -y
+
+# Source the cargo env.
+source $HOME/.cargo/env
+
 echo "Done installing Nitro Enclaves CLI, exit the session and login again for changes to take effect."

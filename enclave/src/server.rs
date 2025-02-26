@@ -211,10 +211,14 @@ impl Server {
         // Take the guard to ensure only one execution can be running at a time.
         let _guard = self.execution_guard.lock();
 
+        println!("Setup start");
         let (_, vk) = self.prover.setup(&program);
+        println!("Setup complete");
 
         match self.prover.execute(&program, &stdin).run() {
             Ok((public_values, _)) => {
+                println!("Execute complete");
+
                 let vkey_raw = vk.bytes32_raw();
 
                 let to_sign = [vkey_raw.to_vec(), public_values.to_vec()].concat();

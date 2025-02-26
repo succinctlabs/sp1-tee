@@ -58,6 +58,7 @@ async fn main() {
             tracing::info!("Ctrl-C received, terminating enclaves");
 
             sp1_tee_host::server::terminate_enclaves();
+            std::process::exit(0);
         }
     }
 }

@@ -9,11 +9,6 @@ use sp1_tee_host::{
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
-/// A VSOCK address is defined as the tuple of (CID, port).
-///
-/// So its OK to hardcode the port here.
-const ENCLAVE_PORT: u16 = 5005;
-
 #[tokio::main]
 async fn main() {
     // todo: improve beyond default.
@@ -61,7 +56,7 @@ async fn execute(
     let _guard = server.execution_mutex.lock().await;
 
     // Open a connection to the enclave.
-    let mut stream = HostStream::new(server.cid, ENCLAVE_PORT)
+    let mut stream = HostStream::new(server.cid, sp1_tee_common::ENCLAVE_PORT)
         .await
         .map_err(|e| {
             tracing::error!("Failed to connect to enclave: {}", e);

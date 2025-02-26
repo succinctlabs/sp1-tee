@@ -62,7 +62,7 @@ impl Server {
     pub fn new(args: &ServerArgs) -> Arc<Self> {
         start_enclave(args);
 
-        spawn_attestation_task(args.enclave_cid, args.port, crate::attestations::ATTESTATION_INTERVAL);
+        spawn_attestation_task(args.enclave_cid, sp1_tee_common::ENCLAVE_PORT, crate::attestations::ATTESTATION_INTERVAL);
 
         Arc::new(Self {
             execution_mutex: tokio::sync::Mutex::new(()),

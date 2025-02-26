@@ -3,6 +3,11 @@ use serde::{Serialize, Deserialize};
 mod communication;
 pub use communication::{VsockStream, CommunicationError};
 
+/// A VSOCK address is defined as the tuple of (CID, port).
+///
+/// So its OK to hardcode the port here.
+pub const ENCLAVE_PORT: u16 = 5005;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum EnclaveRequest {
     /// Print from the enclave to the debug console.

@@ -55,7 +55,7 @@ impl Server {
     pub async fn run(self) {
         let this = Arc::new(self);
 
-        let addr = VsockAddr::new(this.args.cid.unwrap_or(VMADDR_CID_ANY), this.args.port);
+        let addr = VsockAddr::new(this.args.cid.unwrap_or(VMADDR_CID_ANY), sp1_tee_common::ENCLAVE_PORT as u32);
 
         let listener = VsockListener::bind(addr).expect("Failed to bind to vsock");
 

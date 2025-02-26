@@ -52,6 +52,8 @@ if [[ $1 == "run" ]]; then
     # Note, logs are only available in debug mode.
     if [[ $2 == "-f" || $2 == "--debug" ]]; then
         $RUN_COMMAND --debug-mode
+    else
+        $RUN_COMMAND
     fi
 
     # sleep for a bit to ensure the enclave is running.

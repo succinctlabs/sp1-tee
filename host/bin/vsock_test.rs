@@ -1,5 +1,5 @@
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse, VsockStream};
-use sp1_tee_host::attestations::verify_attestation;
+use sp1_tee_host::{attestations::verify_attestation, HostStream};
 
 use clap::Parser;
 
@@ -11,17 +11,29 @@ struct Args {
 
     /// The port of the enclave to connect to.
     #[clap(short, long)]
-    port: Option<u32>,
+    port: Option<u16>,
 }
 
 #[tokio::main]
 async fn main() {
     let Args { cid, port } = Args::parse();
 
+    for _ in 0..10 {
+        let mut stream = HostStream::new(cid.unwrap_or(10), port.unwrap_or(5005))
+            .await
+            .unwrap();
+
+        let message = EnclaveRequest::Print("Hello from the host!".to_string());
+
+        stream.send(message).await.unwrap();
+        stream.send(EnclaveRequest::CloseSession).await.unwrap();
+    }
+
     // Accept connections from any CID, on port `VSOCK_PORT`.
-    let mut stream = VsockStream::connect(cid.unwrap_or(10), port.unwrap_or(5005))
+    let mut stream = VsockStream::connect(cid.unwrap_or(10), port.unwrap_or(5005) as u32)
         .await
         .unwrap();
+
 
     let print = EnclaveRequest::Print("Hello from the host!".to_string());
     let get_public_key = EnclaveRequest::GetPublicKey;

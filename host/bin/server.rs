@@ -83,6 +83,8 @@ async fn execute(
             ServerError::FailedToConnectToEnclave
         })?;
 
+    tracing::debug!("Successfully connected to enclave");
+
     // Setup the request.
     let request = EnclaveRequest::Execute {
         program: request.program,
@@ -95,12 +97,16 @@ async fn execute(
         ServerError::FailedToSendRequestToEnclave
     })?;
 
+    tracing::debug!("Successfully sent request to enclave");
+
     // Receive the response from the enclave.
     let response = stream.recv().await.map_err(|e| {
         tracing::error!("Failed to receive response from enclave: {:?}", e);
 
         ServerError::FailedToReceiveResponseFromEnclave
     })?;
+
+    tracing::debug!("Successfully received response from enclave");
 
     match response {
         EnclaveResponse::SignedPublicValues {

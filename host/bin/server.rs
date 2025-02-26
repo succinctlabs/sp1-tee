@@ -16,7 +16,7 @@ use tokio::net::TcpListener;
 /// The default filter is `sp1-tee-server=debug,info`.
 fn init_tracing() {
     let default_env_filter = EnvFilter::try_from_default_env().unwrap_or(
-        EnvFilter::from_str("sp1-tee-server=debug,info").expect("Failed to server default env filter")
+        EnvFilter::from_str("sp1_tee_server=debug,sp1_tee_host=debug,info").expect("Failed to server default env filter")
     );
 
     tracing_subscriber::fmt()

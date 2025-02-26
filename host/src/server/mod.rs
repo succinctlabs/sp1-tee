@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{path::Path, sync::Arc, time::Duration};
 
 use clap::Parser;
 
@@ -92,11 +92,9 @@ pub struct ServerArgs {
 pub fn start_enclave(args: &ServerArgs) {
     const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
-    println!("MANIFEST_DIR: {}", MANIFEST_DIR);
-
     // Run the enclave.sh script.
     let mut command = std::process::Command::new("sh");
-    command.current_dir(format!("../{}", MANIFEST_DIR));
+    command.current_dir(Path::new(MANIFEST_DIR).parent().unwrap());
     command.arg("enclave.sh");
     command.arg("run");
     if args.debug {

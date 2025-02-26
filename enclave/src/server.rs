@@ -111,7 +111,7 @@ impl Server {
             EnclaveRequest::Print(message) => {
                 println!("{}", message);
 
-                stream.blocking_send(EnclaveResponse::Ack).unwrap();
+                let _ =stream.blocking_send(EnclaveResponse::Ack);
             }
             EnclaveRequest::AttestSigningKey => match self.attest_signing_key() {
                 Ok(attestation) => {

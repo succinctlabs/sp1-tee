@@ -124,6 +124,27 @@ pub fn start_enclave(args: &ServerArgs) {
     );
 }
 
+pub fn terminate_enclaves() {
+    const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
+
+     // Run the enclave.sh script.
+    let mut command = std::process::Command::new("sh");
+    command.current_dir(Path::new(MANIFEST_DIR).parent().unwrap());
+    
+    // Pipe the output to the parent process.
+    command.stderr(std::process::Stdio::inherit());
+    command.stdout(std::process::Stdio::inherit());
+
+    command.arg("enclave.sh");
+    command.arg("terminate");
+
+    let output = command.output().expect("Failed to run enclave.sh");
+    if !output.status.success() {
+        tracing::error!("Failed to terminate enclaves");
+        std::process::exit(1);
+    }
+}
+
 /// Spawn a task that will save attestations to S3.
 /// 
 /// This function will run until the program is killed.
@@ -139,7 +160,12 @@ pub fn spawn_attestation_task(cid: u32, port: u32, interval: Duration) {
             )
             .await
             {
+                // If the attestation fails, we try again sooner.
+                const TRY_AGAIN_INTERVAL: Duration = Duration::from_secs(5);
+
                 tracing::error!("Failed to save attestation: {}", e);
+                tokio::time::sleep(TRY_AGAIN_INTERVAL).await;
+                continue;
             }
 
             tokio::time::sleep(interval).await;

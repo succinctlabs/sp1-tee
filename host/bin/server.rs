@@ -46,9 +46,19 @@ async fn main() {
 
     tracing::info!("Listening on {}:{}", args.address, args.port);
 
-    axum::serve(listener, app.into_make_service())
-        .await
-        .expect("Failed to serve");
+    // Run the server indefinitely or wait for a Ctrl-C.
+    tokio::select! {
+        e = axum::serve(listener, app.into_make_service()) => {
+            if let Err(e) = e {
+                tracing::error!("Server error: {}", e);
+            }
+        }
+        _ = tokio::signal::ctrl_c() => {
+            tracing::info!("Ctrl-C received, terminating enclaves");
+
+            sp1_tee_host::server::terminate_enclaves();
+        }
+    }
 }
 
 /// Execute a program on the enclave.

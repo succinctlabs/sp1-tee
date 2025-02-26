@@ -3,13 +3,13 @@ use serde::{Deserialize, Serialize};
 
 use k256::ecdsa::Signature;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TEERequest {
     pub program: Vec<u8>,
     pub stdin: SP1Stdin,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TEEResponse {
     pub vkey: [u8; 32],
     pub public_values: Vec<u8>,

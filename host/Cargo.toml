@@ -23,6 +23,10 @@ path = "bin/save_attestation.rs"
 name = "validate_attestations"
 path = "bin/validate_attestations.rs"
 
+[[example]]
+name = "fibonacci"
+path = "examples/fibonacci.rs"
+
 [dependencies]
 sp1-tee-common = { workspace = true }
 tokio-vsock = { workspace = true }
@@ -48,6 +52,9 @@ hex = "0.4.3"
 axum = "0.8.1"
 
 sp1-sdk = { workspace = true }
+
+[dev-dependencies]
+reqwest = { version = "0.12.11", features = ["json"] }
 
 [features]
 production = []

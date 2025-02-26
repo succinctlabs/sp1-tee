@@ -5,7 +5,7 @@ use clap::Parser;
 #[derive(Debug, Parser)]
 struct Args {
     /// The address to connect to.
-    #[clap(short, long, default_value = "http://localhost:3000")]
+    #[clap(short, long, default_value = "http://localhost:3000/execute")]
     address: String,
 
     /// The number of fibonacci numbers to compute.

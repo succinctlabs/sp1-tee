@@ -150,6 +150,12 @@ pub fn terminate_enclaves() {
 /// This function will run until the program is killed.
 pub fn spawn_attestation_task(cid: u32, port: u32, interval: Duration) {
     tokio::spawn(async move {
+        // If the attestation fails, we try again sooner.
+        const TRY_AGAIN_INTERVAL: Duration = Duration::from_secs(5);
+
+        // Sleep for a bit before starting the loop, this allows the enclave to start.
+        tokio::time::sleep(TRY_AGAIN_INTERVAL).await;
+
         loop {
             if let Err(e) = crate::attestations::save_attestation(
                 crate::attestations::SaveAttestationArgs {
@@ -160,9 +166,6 @@ pub fn spawn_attestation_task(cid: u32, port: u32, interval: Duration) {
             )
             .await
             {
-                // If the attestation fails, we try again sooner.
-                const TRY_AGAIN_INTERVAL: Duration = Duration::from_secs(5);
-
                 tracing::error!("Failed to save attestation: {}", e);
                 tokio::time::sleep(TRY_AGAIN_INTERVAL).await;
                 continue;

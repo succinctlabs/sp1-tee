@@ -12,12 +12,12 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 WORKDIR app
 
-COPY install-deps.sh ./
+COPY install-guest.sh ./
 
-# Make sure your install-deps script is executable and run it
-RUN sed -i 's/sudo //g' ./install-deps.sh
-RUN chmod +x ./install-deps.sh
-RUN ./install-deps.sh
+# Make sure your install-guest script is executable and run it
+RUN sed -i 's/sudo //g' ./install-guest.sh
+RUN chmod +x ./install-guest.sh
+RUN ./install-guest.sh
 
 # Copy the entire Rust workspace into /app
 COPY . ./

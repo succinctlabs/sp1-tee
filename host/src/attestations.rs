@@ -36,16 +36,16 @@ impl Default for SaveAttestationArgs {
 
 #[derive(Debug, thiserror::Error)]
 pub enum SaveAttestationError {
-    #[error("Failed to communicate with enclave: {0}")]
+    #[error("Failed to communicate with enclave: {0:?}")]
     VsockError(#[from] CommunicationError),
 
-    #[error("Failed to put object: {0}")]
+    #[error("Failed to put object: {0:?}")]
     S3PutObjectError(#[from] SdkError<PutObjectError>),
 
     #[error("Got a bad public key from the enclave, this is a bug.")]
     BadPublicKey,
 
-    #[error("Unexpected message from enclave, expected signing key attestation, got {0}")]
+    #[error("Unexpected message from enclave, expected signing key attestation, got {0:?}")]
     UnexpectedMessage(&'static str),
 }
 

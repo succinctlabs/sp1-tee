@@ -53,6 +53,7 @@ if [[ $1 == "run" ]]; then
     # sleep for a bit to ensure the enclave is running.
     sleep 2
 
-    if [[ $2 == "-f" || $2 == "--debug" ]]; then
-    nitro-cli console --enclave-name sp1-tee
+    if [[ $2 == "-f" ]]; then
+        nitro-cli console --enclave-name sp1-tee
+    fi
 fi

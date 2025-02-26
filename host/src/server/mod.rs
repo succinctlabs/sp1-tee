@@ -90,9 +90,11 @@ pub struct ServerArgs {
 /// 
 /// This function will block until the enclave is started or force the program to exit with an error code.
 pub fn start_enclave(args: &ServerArgs) {
+    const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
+
     // Run the enclave.sh script.
     let mut command = std::process::Command::new("sh");
-    command.current_dir("../");
+    command.current_dir(format!("../{}", MANIFEST_DIR));
     command.arg("enclave.sh");
     command.arg("run");
     if args.debug {

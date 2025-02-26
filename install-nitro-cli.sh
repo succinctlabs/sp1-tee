@@ -1,5 +1,5 @@
 # Install the Nitro Enclaves CLI.
-sudo dnf install aws-nitro-enclaves-cli aws-nitro-enclaves-cli-devel -y
+sudo dnf install aws-nitro-enclaves-cli aws-nitro-enclaves-cli-devel openssl openssl-devel -y
 
 # Add the ec2-user to the ne group.
 sudo usermod -aG ne ec2-user

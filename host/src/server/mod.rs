@@ -90,6 +90,7 @@ pub struct ServerArgs {
 /// 
 /// This function will block until the enclave is started or force the program to exit with an error code.
 pub fn start_enclave(args: &ServerArgs) {
+    // Run the enclave.sh script.
     let mut command = std::process::Command::new("sh");
     command.current_dir("../");
     command.arg("enclave.sh");
@@ -98,15 +99,18 @@ pub fn start_enclave(args: &ServerArgs) {
         command.arg("--debug");
     }
 
+    // Set the environment variables.
     command.env("ENCLAVE_CID", args.enclave_cid.to_string());
     command.env("ENCLAVE_CPU_COUNT", args.enclave_cores.to_string());
     command.env("ENCLAVE_MEMORY", args.enclave_memory.to_string());
 
-    let output = command.output().expect("Failed to start enclave");
+    // Pipe the output to the parent process.
+    command.stdout(std::process::Stdio::inherit());
+    command.stderr(std::process::Stdio::inherit());
+
+    let output = command.output().expect("Failed to run enclave.sh");
     if !output.status.success() {
         tracing::error!("Failed to start enclave");
-        tracing::error!("[stdout]: {}", String::from_utf8_lossy(&output.stdout));
-        tracing::error!("[stderr]: {}", String::from_utf8_lossy(&output.stderr));
         std::process::exit(1);
     }
 

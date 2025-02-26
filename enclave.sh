@@ -7,7 +7,11 @@ VALID_COMMANDS=" ${COMMANDS[*]} "
 
 # Single if-check for both "is $1 empty?" AND "is $1 not in COMMANDS?"
 if [[ -z "$1" || ! $VALID_COMMANDS =~ " $1 " ]]; then
-    echo "Usage: $0 [build [-f follow]] | run | terminate ]"
+    echo "Usage: $0 [build [-f follow]] | run | terminate | count ]"
+    echo "  build: Build the enclave"
+    echo "  run: Build and run the enclave"
+    echo "  terminate: Terminate all enclaves"
+    echo "  count: Count the number of enclaves running"
     exit 1
 fi
 

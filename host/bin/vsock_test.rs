@@ -2,6 +2,7 @@ use sp1_tee_common::{EnclaveRequest, EnclaveResponse, VsockStream};
 use sp1_tee_host::{attestations::verify_attestation, HostStream};
 
 use clap::Parser;
+use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
 struct Args {
@@ -16,6 +17,10 @@ struct Args {
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from("debug"))
+        .init();
+
     let Args { cid, port } = Args::parse();
 
     for _ in 0..10 {

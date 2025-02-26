@@ -55,7 +55,10 @@ impl Server {
     pub async fn run(self) {
         let this = Arc::new(self);
 
-        let addr = VsockAddr::new(this.args.cid.unwrap_or(VMADDR_CID_ANY), sp1_tee_common::ENCLAVE_PORT as u32);
+        let addr = VsockAddr::new(
+            this.args.cid.unwrap_or(VMADDR_CID_ANY),
+            sp1_tee_common::ENCLAVE_PORT as u32,
+        );
 
         let listener = VsockListener::bind(addr).expect("Failed to bind to vsock");
 
@@ -68,11 +71,13 @@ impl Server {
             // Spawn a new (blocking) thread to handle the request.
             //
             // Tokio tasks aren't preferable here as exeuction (the most likely request type) should be considered blocking.
-            std::thread::spawn({
+            tokio::task::spawn({
                 let this = this.clone();
 
-                move || {
-                    this.handle_connection(stream);
+                println!("Spawning new connection");
+
+                async move {
+                    this.handle_connection(stream).await;
                 }
             });
         }
@@ -81,13 +86,15 @@ impl Server {
     /// Handles a connection from the host.
     ///
     /// NOTE: unwraps are used here on recv as this is only ran in a spawned thread.
-    fn handle_connection(&self, stream: VsockStreamRaw) {
+    async fn handle_connection(self: Arc<Self>, stream: VsockStreamRaw) {
         let mut stream = VsockStream::<EnclaveRequest, EnclaveResponse>::new(stream);
 
         loop {
-            let message = stream.blocking_recv().unwrap();
+            let message = stream.recv().await.unwrap();
 
-            match self.handle_message(message, &mut stream) {
+            println!("Received message: {:?}", message.type_of());
+
+            match self.clone().handle_message(message, &mut stream).await {
                 ConnectionState::Continue => {}
                 ConnectionState::Close => {
                     println!("Connection closed.");
@@ -102,8 +109,8 @@ impl Server {
     /// Returns false if the connection should be closed.
     ///
     /// NOTE: unwraps are used here on sends as this is only ran in a spawned thread.
-    fn handle_message(
-        &self,
+    async fn handle_message(
+        self: Arc<Self>,
         message: EnclaveRequest,
         stream: &mut VsockStream<EnclaveRequest, EnclaveResponse>,
     ) -> ConnectionState {
@@ -111,44 +118,61 @@ impl Server {
             EnclaveRequest::Print(message) => {
                 println!("{}", message);
 
-                let _ =stream.blocking_send(EnclaveResponse::Ack);
+                let _ = stream.send(EnclaveResponse::Ack);
             }
-            EnclaveRequest::AttestSigningKey => match self.attest_signing_key() {
-                Ok(attestation) => {
-                    stream
-                        .blocking_send(EnclaveResponse::SigningKeyAttestation(attestation))
-                        .unwrap();
+            EnclaveRequest::AttestSigningKey => {
+                match tokio::task::spawn_blocking(move || self.attest_signing_key()).await {
+                    Ok(response) => {
+                        stream.send(response).await.unwrap();
+                    }
+                    Err(e) => {
+                        stream
+                            .send(EnclaveResponse::Error(format!(
+                                "Join error when attesting signing key: {:?}",
+                                e
+                            )))
+                            .await
+                            .unwrap();
+                    }
                 }
-                Err(e) => {
-                    stream
-                        .blocking_send(EnclaveResponse::Error(format!(
-                            "Failed to attest to the signing key: {:?}",
-                            e
-                        )))
-                        .unwrap();
-                }
-            },
+            }
             EnclaveRequest::GetPublicKey => {
                 let public_key = self.get_public_key();
 
                 stream
-                    .blocking_send(EnclaveResponse::PublicKey(public_key))
+                    .send(EnclaveResponse::PublicKey(public_key))
+                    .await
                     .unwrap();
             }
             EnclaveRequest::Execute { stdin, program } => {
-                stream.blocking_send(self.execute(stdin, program)).unwrap();
+                match tokio::task::spawn_blocking(move || self.execute(stdin, program)).await {
+                    Ok(response) => {
+                        stream.send(response).await.unwrap();
+                    }
+                    Err(e) => {
+                        stream
+                            .send(EnclaveResponse::Error(format!(
+                                "Join error when executing program: {:?}",
+                                e
+                            )))
+                            .await
+                            .unwrap();
+                    }
+                }
             }
             EnclaveRequest::CloseSession => {
                 return ConnectionState::Close;
             }
             EnclaveRequest::GetEncryptedSigningKey => {
                 stream
-                    .blocking_send(EnclaveResponse::Error("Not implemented".to_string()))
+                    .send(EnclaveResponse::Error("Not implemented".to_string()))
+                    .await
                     .unwrap();
             }
             EnclaveRequest::SetSigningKey(_) => {
                 stream
-                    .blocking_send(EnclaveResponse::Error("Not implemented".to_string()))
+                    .send(EnclaveResponse::Error("Not implemented".to_string()))
+                    .await
                     .unwrap();
             }
         }
@@ -176,11 +200,11 @@ impl Server {
     }
 
     /// Attests to the signing key.
-    fn attest_signing_key(&self) -> Result<Vec<u8>, ServerError> {
+    fn attest_signing_key(&self) -> EnclaveResponse {
         let fd = nsm_init();
 
         if fd < 0 {
-            return Err(ServerError::FailedToInitNSM);
+            return EnclaveResponse::Error("Failed to initialize NSM".to_string());
         }
 
         // SEC1 encoded public key.
@@ -199,8 +223,12 @@ impl Server {
         nsm_exit(fd);
 
         match response {
-            Response::Attestation { document, .. } => Ok(document),
-            _ => Err(ServerError::UnexpectedResponseType),
+            Response::Attestation { document, .. } => {
+                EnclaveResponse::SigningKeyAttestation(document)
+            }
+            _ => EnclaveResponse::Error(
+                "Unexpected response type from NSM, this is a bug.".to_string(),
+            ),
         }
     }
 
@@ -243,13 +271,4 @@ impl Server {
             Err(e) => EnclaveResponse::Error(format!("Failed to execute program: {:?}", e)),
         }
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-enum ServerError {
-    #[error("Failed to initialize NSM")]
-    FailedToInitNSM,
-
-    #[error("Unexpected response type from NSM, this is a bug.")]
-    UnexpectedResponseType,
 }

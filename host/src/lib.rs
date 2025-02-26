@@ -22,7 +22,7 @@ pub const S3_BUCKET: &str = "sp1-tee-attestations-testing";
 ///
 /// This stream is bi-directional, and it will automatically close the connection when the stream is dropped.
 pub struct HostStream {
-    stream: VsockStream<EnclaveResponse, EnclaveRequest>,
+    stream: Option<VsockStream<EnclaveResponse, EnclaveRequest>>,
 }
 
 impl HostStream {
@@ -30,28 +30,29 @@ impl HostStream {
     pub async fn new(cid: u32, port: u16) -> Result<Self, CommunicationError> {
         let stream = VsockStream::connect(cid, port as u32).await?;
 
-        Ok(Self { stream })
+        Ok(Self { stream: Some(stream) })
     }
 
     /// Sends a request to the enclave.
     pub async fn send(&mut self, request: EnclaveRequest) -> Result<(), CommunicationError> {
-        self.stream.send(request).await
+        self.stream.as_mut().expect("Stream should be initialized, this is a bug").send(request).await
     }
 
     /// Receives a response from the enclave.
     pub async fn recv(&mut self) -> Result<EnclaveResponse, CommunicationError> {
-        self.stream.recv().await
+        self.stream.as_mut().expect("Stream should be initialized, this is a bug").recv().await
     }
 }
 
 impl Drop for HostStream {
     fn drop(&mut self) {
-        // Make sure the enclave drops the connection when the host drops the stream.
-        //
-        // Ignore any errors as they stream may already be closed.
-        if let Err(e) = self.stream.blocking_send(EnclaveRequest::CloseSession) {
-            tracing::error!("Failed to send close session request: {}", e);
-        }
+        let mut stream = self.stream.take().expect("Stream should be initialized, this is a bug");
+
+        tokio::task::spawn(async move {
+            if let Err(e) = stream.send(EnclaveRequest::CloseSession).await {
+                tracing::error!("Failed to send close session request: {}", e);
+            }
+        });
     }
 }
 

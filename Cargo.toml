@@ -1,5 +1,4 @@
 [workspace]
-name = "sp1-tee"
 members = ["host", "enclave", "common"]
 resolver = "2"
 

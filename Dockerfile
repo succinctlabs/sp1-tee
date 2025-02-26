@@ -1,6 +1,8 @@
 # ---- Build Stage ----
 FROM public.ecr.aws/amazonlinux/amazonlinux:2023 AS builder
 
+ARG DEBUG_MODE=0
+
 # Install system dependencies required to build Rust projects
 RUN yum update -y \
     && yum install -y gcc clang
@@ -25,7 +27,11 @@ COPY . ./
 # Sanity check that cmake is installed.
 RUN cmake --version
 
-RUN cargo build --release --bin sp1-tee-enclave
+RUN if [ "${DEBUG_MODE}" = "1" ]; then \
+        cargo build --release --bin sp1-tee-enclave --features debug-mode; \
+    else \
+        cargo build --release --bin sp1-tee-enclave; \
+    fi
 
 # ---- Runtime Stage ----
 FROM public.ecr.aws/amazonlinux/amazonlinux:2023

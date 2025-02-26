@@ -27,7 +27,11 @@ if [ $1 == "terminate" ]; then
 fi
 
 # Always build the enclave from scratch.
-docker build -t sp1-tee .
+if [ $2 == "-f" || $2 == "--debug" ]; then
+    docker build --build-arg DEBUG_MODE=1 -t sp1-tee .
+else
+    docker build -t sp1-tee .
+fi
 
 # Create the EIF from the enclave.
 nitro-cli build-enclave --docker-uri sp1-tee:latest --output-file sp1-tee.eif

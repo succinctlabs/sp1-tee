@@ -120,7 +120,8 @@ async fn execute(
                 vkey,
                 public_values,
                 signature,
-                recovery_id,
+                // Add 27 to the recovery id, this follows from the EIP-2718 standard.
+                recovery_id: recovery_id + 27,
             }))
         }
         EnclaveResponse::Error(error) => {

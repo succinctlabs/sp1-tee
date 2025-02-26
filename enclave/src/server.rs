@@ -18,6 +18,13 @@ enum ConnectionState {
     Close,
 }
 
+macro_rules! debug_print {
+    ($($tt:tt)*) => {
+        #[cfg(feature = "debug-mode")]
+        println!($($tt)*);
+    };
+}
+
 pub struct Server {
     /// The arguments passed to the enclave at startup.
     args: EnclaveArgs,
@@ -39,7 +46,7 @@ impl Server {
     pub fn new(args: EnclaveArgs) -> Self {
         let signing_key = SigningKey::random(&mut OsRng);
 
-        println!(
+        debug_print!(
             "Server started with public key: {:?}",
             signing_key.verifying_key()
         );
@@ -74,7 +81,7 @@ impl Server {
             tokio::task::spawn({
                 let this = this.clone();
 
-                println!("Spawning new connection");
+                debug_print!("Spawning new connection");
 
                 async move {
                     this.handle_connection(stream).await;
@@ -92,12 +99,12 @@ impl Server {
         loop {
             let message = stream.recv().await.unwrap();
 
-            println!("Received message: {:?}", message.type_of());
+            debug_print!("Received message: {:?}", message.type_of());
 
             match self.clone().handle_message(message, &mut stream).await {
                 ConnectionState::Continue => {}
                 ConnectionState::Close => {
-                    println!("Connection closed.");
+                    debug_print!("Connection closed.");
                     break;
                 }
             }
@@ -116,9 +123,17 @@ impl Server {
     ) -> ConnectionState {
         match message {
             EnclaveRequest::Print(message) => {
-                println!("{}", message);
+                debug_print!("{}", message);
 
                 let _ = stream.send(EnclaveResponse::Ack);
+            }
+            EnclaveRequest::GetPublicKey => {
+                let public_key = self.get_public_key();
+
+                stream
+                    .send(EnclaveResponse::PublicKey(public_key))
+                    .await
+                    .unwrap();
             }
             EnclaveRequest::AttestSigningKey => {
                 match tokio::task::spawn_blocking(move || self.attest_signing_key()).await {
@@ -136,14 +151,6 @@ impl Server {
                     }
                 }
             }
-            EnclaveRequest::GetPublicKey => {
-                let public_key = self.get_public_key();
-
-                stream
-                    .send(EnclaveResponse::PublicKey(public_key))
-                    .await
-                    .unwrap();
-            }
             EnclaveRequest::Execute { stdin, program } => {
                 match tokio::task::spawn_blocking(move || self.execute(stdin, program)).await {
                     Ok(response) => {
@@ -160,9 +167,6 @@ impl Server {
                     }
                 }
             }
-            EnclaveRequest::CloseSession => {
-                return ConnectionState::Close;
-            }
             EnclaveRequest::GetEncryptedSigningKey => {
                 stream
                     .send(EnclaveResponse::Error("Not implemented".to_string()))
@@ -174,6 +178,9 @@ impl Server {
                     .send(EnclaveResponse::Error("Not implemented".to_string()))
                     .await
                     .unwrap();
+            }
+            EnclaveRequest::CloseSession => {
+                return ConnectionState::Close;
             }
         }
 
@@ -239,13 +246,13 @@ impl Server {
         // Take the guard to ensure only one execution can be running at a time.
         let _guard = self.execution_guard.lock();
 
-        println!("Setup start");
+        debug_print!("Setup start");
         let (_, vk) = self.prover.setup(&program);
-        println!("Setup complete");
+        debug_print!("Setup complete");
 
         match self.prover.execute(&program, &stdin).run() {
             Ok((public_values, _)) => {
-                println!("Execute complete");
+                debug_print!("Execute complete");
 
                 let vkey_raw = vk.bytes32_raw();
 

@@ -27,6 +27,8 @@ async fn main() {
 
         stream.send(message).await.unwrap();
         stream.send(EnclaveRequest::CloseSession).await.unwrap();
+
+        drop(stream);
     }
 
     // Accept connections from any CID, on port `VSOCK_PORT`.

@@ -49,7 +49,9 @@ impl Drop for HostStream {
         // Make sure the enclave drops the connection when the host drops the stream.
         //
         // Ignore any errors as they stream may already be closed.
-        let _ = self.stream.blocking_send(EnclaveRequest::CloseSession);
+        if let Err(e) = self.stream.blocking_send(EnclaveRequest::CloseSession) {
+            tracing::error!("Failed to send close session request: {}", e);
+        }
     }
 }
 

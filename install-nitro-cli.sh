@@ -22,4 +22,7 @@ curl https://sh.rustup.rs -sSf | sh -s -- -y
 # Source the cargo env.
 source $HOME/.cargo/env
 
+# Initialize the submodules.
+git submodule update --init --recursive
+
 echo "Done installing Nitro Enclaves CLI, exit the session and login again for changes to take effect."

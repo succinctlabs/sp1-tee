@@ -15,7 +15,7 @@ pub enum EnclaveRequest {
     AttestSigningKey,
     /// An execution request, sent from the host to the enclave.
     Execute {
-        stdin: Vec<u8>,
+        stdin: sp1_sdk::SP1Stdin,
         program: Vec<u8>,
     },
     /// Set the enclave's signing key.
@@ -32,8 +32,13 @@ pub enum EnclaveResponse {
     /// An attestation document with the public key field set.
     SigningKeyAttestation(Vec<u8>),
     /// The result of an execution, sent from the enclave to the host.
+    /// 
+    /// The signature is of the form [ vkey || public_values ]
     SignedPublicValues {
-        a: Vec<u8>,
+        vkey: [u8; 32],
+        public_values: Vec<u8>,
+        signature: k256::ecdsa::Signature,
+        recovery_id: u8,
     },
     /// The receiver of this variant should print this message to stdout.
     Error(String),

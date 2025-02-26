@@ -5,6 +5,13 @@ use sp1_tee_common::{CommunicationError, EnclaveRequest, EnclaveResponse, VsockS
 pub mod attestations;
 pub use attestations::{save_attestation, SaveAttestationArgs, SaveAttestationError};
 
+pub mod contract;
+pub use contract::TEEVerifier;
+
+pub mod api;
+
+pub mod server;
+
 #[cfg(feature = "production")]
 pub const S3_BUCKET: &str = "sp1-tee-attestations";
 
@@ -54,8 +61,20 @@ pub fn ethereum_address_from_encoded_point(encoded_point: &k256::EncodedPoint) -
         return None;
     }
 
-    // Note: The leading 0x04 is an indentifier, and should be skipped for the hashing.
-    Some(Address::from_raw_public_key(&encoded_point.as_bytes()[1..]))
+    Some(ethereum_address_from_sec1_bytes(encoded_point.as_bytes()))
+}
+
+/// Converts a K256 SEC1 encoded public key to an Ethereum address.
+/// 
+/// SEC1 bytes are of the form:
+/// 
+/// ```
+/// [ 0x04 || x || y ]
+/// ```
+/// 
+/// Ethereum address are derived as `keccack256([x || y])[12..]`
+pub fn ethereum_address_from_sec1_bytes(public_key: &[u8]) -> Address {
+    Address::from_raw_public_key(&public_key[1..])
 }
 
 pub async fn s3_client() -> aws_sdk_s3::Client {

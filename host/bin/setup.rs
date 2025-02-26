@@ -8,6 +8,10 @@ use serde::Deserialize;
 
 use clap::Parser;
 
+use sp1_tee_host::attestations::RawAttestation;
+use sp1_tee_host::contract::TEEVerifier;
+use sp1_tee_host::ethereum_address_from_sec1_bytes;
+
 /// The folder containing the deployment (json) files.
 const DEPLOY_FOLDER: &str = "contracts/deployments";
 
@@ -43,6 +47,11 @@ struct Args {
     /// The etherscan URL to use.
     #[clap(long)]
     etherscan_url: Option<String>,
+
+    /// An optional (hex-encoded) PCR0 to check against when verifying attestations.
+    /// This ensures the correct program is being run on the enclave.
+    #[clap(long)]
+    pcr0: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -50,23 +59,6 @@ struct Deployment {
     #[serde(rename = "SP1TeeVerifier")]
     sp1_tee_verifier: Address,
 }
-
-alloy::sol! {
-    #[sol(rpc)]
-    contract _TEEVerifier {
-        /// @notice Sets a valid PCR0 corresponding to a program that runs an SP1 executor.
-        ///
-        /// @dev Only the owner can set a valid PCR0.
-        function setValidPCR0(bytes memory pcr0) external;
-
-        /// @notice Adds a signer to the list of signers, after validating an attestation.
-        ///
-        /// @dev Only the owner or the manager can add a signer.
-        function addSigner(bytes memory attestationTbs, bytes memory signature) external;
-    }
-}
-
-type TEEVerifier<P, N> = _TEEVerifier::_TEEVerifierInstance<(), P, N>;
 
 #[tokio::main]
 async fn main() {
@@ -145,40 +137,43 @@ async fn main() {
     // Add the signers
     ///////////////////////////////
 
-    let s3_client = sp1_tee_host::s3_client().await;
-
-    let attestations = s3_client
-        .list_objects_v2()
-        .bucket(sp1_tee_host::S3_BUCKET.to_string())
-        .send()
+    let attestations = sp1_tee_host::attestations::get_raw_attestations()
         .await
-        .expect("Failed to list attestations");
+        .expect("Failed to get attestations");
 
-    for metadata in &attestations
-        .contents
-        .expect("No contents found in attestations")
-    {
-        let key = metadata.key.clone().expect("No key found in attestations");
+    let verifier = TEEVerifier::new(deployment.sp1_tee_verifier, provider);
 
-        let key_as_address = key.parse::<Address>().expect("Failed to parse key as address");
+    // For each attestation, verify the attestation and add the signer, optionally checking the PCR0.
+    for RawAttestation { address, attestation } in attestations {
+        let doc = sp1_tee_host::attestations::verify_attestation(&attestation)
+            .expect("Failed to verify attestation");
 
-        println!("Adding signer: {}", key_as_address);
+        // PCR0 is optional, as in debug mode PCR0 is empty in the attestation.
+        if let Some(ref pcr0) = args.pcr0 {
+            let pcr0_bytes = hex::decode(pcr0).expect("Failed to decode pcr0");
+            let pcr0_bytes = pcr0_bytes.as_slice();
 
-        // Fetch the actual object from S3.
-        let object = s3_client
-            .get_object()
-            .bucket(sp1_tee_host::S3_BUCKET.to_string())
-            .key(key)
+            if doc.pcrs[&0] != pcr0_bytes {
+                panic!("PCR0 mismatch for address: {}, expected: {:?}, got: {:?}", address, pcr0_bytes, doc.pcrs[&0]);
+            }
+        }
+
+        let pubkey_bytes = doc.public_key.expect("Public key is not set in attestation");
+        let derived_address = ethereum_address_from_sec1_bytes(&pubkey_bytes);
+
+        if derived_address != address {
+            panic!("Address mismatch expected: {:?}, got: {:?}", address, derived_address);
+        }
+
+        verifier
+            .addSigner(address)
             .send()
             .await
-            .expect("Failed to get object");
-
-        let bytes = object.body.collect().await.expect("Failed to collect object body").to_vec();
-
-        let _attestation = bytes;
+            .expect("Failed send tx to add signer")
+            .watch()
+            .await
+            .expect("Failed to get confirmation of adding signer");
     }
-
-    // todo!()
 
     println!("Setup complete.");
 }

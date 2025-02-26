@@ -1,6 +1,7 @@
 [workspace]
 name = "sp1-tee"
 members = ["host", "enclave", "common"]
+resolver = "2"
 
 [workspace.package]
 version = "0.0.1"
@@ -23,6 +24,4 @@ k256 = { version = "0.13.4", features = ["serde"] }
 aws-nitro-enclaves-nsm-api = "0.4.0"
 
 # sp1
-sp1-core-executor = { version = "4.1.0" } 
-sp1-core-machine = { version = "4.1.0" } # Needed for `stdin` type.
-sp1-prover = { version = "4.1.0" } # Needed for subproof verification.
+sp1-sdk = "4.0.0"

@@ -6,7 +6,7 @@ pragma solidity ^0.8.20;
 /// @dev A library for managing an iterable map of signers.
 struct SignersMap {
     /// @dev Whether the address is a signer.
-    mapping (address => bool) isSigner;
+    mapping (address => bool) map;
 
     /// @dev The list of signers.
     address[] signers;
@@ -18,12 +18,12 @@ struct SignersMap {
 
 library IterableMap {
     function addSigner(SignersMap storage self, address signer) internal {
-        if (self.isSigner[signer]) {
+        if (self.map[signer]) {
             revert("Signer already exists");
         }
 
         // Toggle the signer status.
-        self.isSigner[signer] = true;
+        self.map[signer] = true;
 
         // Add the signer to the list.
         self.signers.push(signer);
@@ -33,12 +33,12 @@ library IterableMap {
     }
 
     function removeSigner(SignersMap storage self, address signer) internal {
-        if (!self.isSigner[signer]) {
+        if (!self.map[signer]) {
             revert("Signer does not exist");
         }
 
         // Toggle the signer status.
-        self.isSigner[signer] = false;
+        self.map[signer] = false;
 
         // Delete the signer index.
         uint256 indexToRemove = self.signerIndex[signer];
@@ -61,6 +61,10 @@ library IterableMap {
 
         // Update the index of the signer.
         self.signers.pop();
+    }
+
+    function isSigner(SignersMap storage self, address signer) internal view returns (bool) {
+        return self.map[signer];
     }
 
     function getSigners(SignersMap storage self) internal view returns (address[] memory) {

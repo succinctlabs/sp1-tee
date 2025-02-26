@@ -38,7 +38,12 @@ contract SP1TeeVerifier is SimpleOwnable {
     function getSigners() external view returns (address[] memory) {
         return signersMap.getSigners();
     }
-    
+
+    /// @notice Returns if an address is a signer.
+    function isSigner(address signer) external view returns (bool) {
+        return signersMap.isSigner(signer);
+    }
+
     /// @notice Verifies a proof with given public values and vkey.
     /// @param programVKey The verification key for the RISC-V program.
     /// @param publicValues The public values encoded as bytes.

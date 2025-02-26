@@ -33,7 +33,6 @@ async fn main() {
         let message = EnclaveRequest::Print("Hello from the host!".to_string());
 
         stream.send(message).await.unwrap();
-        stream.send(EnclaveRequest::CloseSession).await.unwrap();
 
         drop(stream);
     }

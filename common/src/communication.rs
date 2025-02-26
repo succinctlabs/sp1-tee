@@ -79,6 +79,8 @@ impl<In, Out> VsockStream<In, Out>
                 Err(e) => {
                     if e.kind() == std::io::ErrorKind::WouldBlock {
                         continue;
+                    } else {
+                        return Err(CommunicationError::Io(e));
                     }
                 }
             }
@@ -97,6 +99,8 @@ impl<In, Out> VsockStream<In, Out>
                 Err(e) => {
                     if e.kind() == std::io::ErrorKind::WouldBlock {
                         continue;
+                    } else {
+                        return Err(CommunicationError::Io(e));
                     }
                 }
             }

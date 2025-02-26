@@ -65,12 +65,14 @@ async fn main() {
 /// Execute a program on the enclave.
 ///
 /// In order to avoid OOM in the enclave, we run only one program at a time.
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip_all, fields(id = ?request.id))]
 async fn execute(
     State(server): State<Arc<Server>>,
     Json(request): Json<TEERequest>,
 ) -> Result<Json<TEEResponse>, ServerError> {
     let _guard = server.execution_mutex.lock().await;
+
+    tracing::info!("Executing request");
 
     // Open a connection to the enclave.
     let mut stream = HostStream::new(server.cid, sp1_tee_common::ENCLAVE_PORT)

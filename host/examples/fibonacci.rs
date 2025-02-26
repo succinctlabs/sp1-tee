@@ -22,6 +22,7 @@ async fn main() {
     stdin.write(&args.count);
 
     let request = TEERequest {
+        id: [1; 32],
         program: program.to_vec(),
         stdin: stdin,
     };

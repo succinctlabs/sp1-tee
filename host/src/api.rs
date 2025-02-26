@@ -5,6 +5,7 @@ use k256::ecdsa::Signature;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TEERequest {
+    pub id: [u8; 32],
     pub program: Vec<u8>,
     pub stdin: SP1Stdin,
 }

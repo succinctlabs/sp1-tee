@@ -92,6 +92,8 @@ pub struct ServerArgs {
 pub fn start_enclave(args: &ServerArgs) {
     const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
+    println!("MANIFEST_DIR: {}", MANIFEST_DIR);
+
     // Run the enclave.sh script.
     let mut command = std::process::Command::new("sh");
     command.current_dir(format!("../{}", MANIFEST_DIR));

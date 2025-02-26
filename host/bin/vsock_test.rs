@@ -21,6 +21,8 @@ async fn main() {
         .with_env_filter(EnvFilter::from("debug"))
         .init();
 
+    tracing::info!("Starting vsock test");
+
     let Args { cid, port } = Args::parse();
 
     for _ in 0..10 {

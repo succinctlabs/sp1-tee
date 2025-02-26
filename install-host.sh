@@ -1,5 +1,5 @@
 # Install the Nitro Enclaves CLI.
-sudo dnf install aws-nitro-enclaves-cli aws-nitro-enclaves-cli-devel openssl openssl-devel -y
+sudo dnf install aws-nitro-enclaves-cli aws-nitro-enclaves-cli-devel openssl-devel -y
 
 # Add the ec2-user to the ne group.
 sudo usermod -aG ne ec2-user
@@ -24,5 +24,11 @@ source $HOME/.cargo/env
 
 # Initialize the submodules.
 git submodule update --init --recursive
+
+# Copy the allocator template to the Nitro Enclaves config directory.
+sudo cp allocator.template.yaml /etc/nitro_enclaves/allocator.yaml
+
+# Restart the Nitro Enclaves Allocator service.
+sudo systemctl restart nitro-enclaves-allocator.service
 
 echo "Done installing Nitro Enclaves CLI, exit the session and login again for changes to take effect."

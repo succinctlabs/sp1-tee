@@ -95,7 +95,7 @@ pub struct ServerArgs {
     pub enclave_cid: u32,
 
     /// The number of cores to use for the enclave.
-    #[clap(long, default_value = "2")]
+    #[clap(long, default_value = "16")]
     pub enclave_cores: u32,
 
     /// The memory to use for the enclave.

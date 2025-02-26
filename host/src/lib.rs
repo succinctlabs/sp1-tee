@@ -27,8 +27,8 @@ pub struct HostStream {
 
 impl HostStream {
     /// Connects to the enclave on the given CID and port.
-    pub async fn new(cid: u32, port: u32) -> Result<Self, CommunicationError> {
-        let stream = VsockStream::connect(cid, port).await?;
+    pub async fn new(cid: u32, port: u16) -> Result<Self, CommunicationError> {
+        let stream = VsockStream::connect(cid, port as u32).await?;
 
         Ok(Self { stream })
     }

@@ -6,16 +6,13 @@ use sp1_tee_host::{
     api::{TEERequest, TEEResponse},
     HostStream,
 };
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 use tokio::net::TcpListener;
 
 /// A VSOCK address is defined as the tuple of (CID, port).
 ///
 /// So its OK to hardcode the port here.
-const ENCLAVE_PORT: u32 = 5005;
-
-// Resubmit the attestation every 12 hours
-const ATTESTATION_INTERVAL: Duration = Duration::from_secs(12 * 60 * 60);
+const ENCLAVE_PORT: u16 = 5005;
 
 #[tokio::main]
 async fn main() {
@@ -24,17 +21,10 @@ async fn main() {
 
     let args = ServerArgs::parse();
 
-    // Start the enclave.
-    sp1_tee_host::server::start_enclave(&args);
-
-    // Spawn the attestation task.
-    sp1_tee_host::server::spawn_attestation_task(
-        args.enclave_cid,
-        ENCLAVE_PORT,
-        ATTESTATION_INTERVAL,
-    );
-
-    let server = Server::new(args.enclave_cid);
+    // Start the server.
+    //
+    // This function also starts the enclave and spawns a task to save attestations to S3.
+    let server = Server::new(&args);
 
     let app = Router::new()
         .route("/execute", post(execute))

@@ -4,6 +4,11 @@ use clap::Parser;
 
 use axum::{http::StatusCode, response::IntoResponse};
 
+/// The directory of the manifest file.
+/// 
+/// Used for locating the enclave.sh script.
+const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
+
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
     #[error("Failed to connect to enclave")]
@@ -51,10 +56,17 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(cid: u32) -> Arc<Self> {
+    /// Create a new server.
+    /// 
+    /// This function will block and start the enclave and spawn a task to save attestations to S3.
+    pub fn new(args: &ServerArgs) -> Arc<Self> {
+        start_enclave(args);
+
+        spawn_attestation_task(args.enclave_cid, args.port, crate::attestations::ATTESTATION_INTERVAL);
+
         Arc::new(Self {
             execution_mutex: tokio::sync::Mutex::new(()),
-            cid,
+            cid: args.enclave_cid,
         })
     }
 }
@@ -90,8 +102,6 @@ pub struct ServerArgs {
 /// 
 /// This function will block until the enclave is started or force the program to exit with an error code.
 pub fn start_enclave(args: &ServerArgs) {
-    const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
-
     // Run the enclave.sh script.
     let mut command = std::process::Command::new("sh");
     command.current_dir(Path::new(MANIFEST_DIR).parent().unwrap());
@@ -125,8 +135,6 @@ pub fn start_enclave(args: &ServerArgs) {
 }
 
 pub fn terminate_enclaves() {
-    const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
-
      // Run the enclave.sh script.
     let mut command = std::process::Command::new("sh");
     command.current_dir(Path::new(MANIFEST_DIR).parent().unwrap());
@@ -148,7 +156,7 @@ pub fn terminate_enclaves() {
 /// Spawn a task that will save attestations to S3.
 /// 
 /// This function will run until the program is killed.
-pub fn spawn_attestation_task(cid: u32, port: u32, interval: Duration) {
+pub fn spawn_attestation_task(cid: u32, port: u16, interval: Duration) {
     tokio::spawn(async move {
         // If the attestation fails, we try again sooner.
         const TRY_AGAIN_INTERVAL: Duration = Duration::from_secs(5);
@@ -167,6 +175,7 @@ pub fn spawn_attestation_task(cid: u32, port: u32, interval: Duration) {
             .await
             {
                 tracing::error!("Failed to save attestation: {}", e);
+                
                 tokio::time::sleep(TRY_AGAIN_INTERVAL).await;
                 continue;
             }

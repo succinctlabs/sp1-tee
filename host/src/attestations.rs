@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use alloy::hex::FromHexError;
 use alloy::primitives::Address;
 use attestation_doc_validation::error::AttestResult;
@@ -12,13 +14,16 @@ use aws_nitro_enclaves_nsm_api::api::AttestationDoc;
 use crate::ethereum_address_from_encoded_point;
 use crate::{s3_client, HostStream};
 
+// Resubmit the attestation every 12 hours
+pub const ATTESTATION_INTERVAL: Duration = Duration::from_secs(12 * 60 * 60);
+
 #[derive(Debug)]
 pub struct SaveAttestationArgs {
     /// The CID of the enclave to connect to.
     pub cid: u32,
 
     /// The port of the enclave to connect to.
-    pub port: u32,
+    pub port: u16,
 
     /// The S3 Bucket to write to
     pub bucket: String,
@@ -86,6 +91,9 @@ pub async fn save_attestation(args: SaveAttestationArgs) -> Result<(), SaveAttes
     // The address of the enclave is the S3 bucket key.
     let key = ethereum_address_from_encoded_point(&public_key)
         .ok_or(SaveAttestationError::BadPublicKey)?;
+
+    tracing::info!("Saving attestation to S3 for address: {}", key);
+
     let key = key.to_string();
 
     // Write the attestation to S3.

@@ -1,14 +1,12 @@
-use sp1_tee_host::api::{EventPayload, TEERequest};
+use sp1_tee_host::api::TEERequest;
+use sp1_tee_host::client::Client;
 use sp1_sdk::SP1Stdin;
 use clap::Parser;
-
-use eventsource_stream::Eventsource;
-use futures::stream::StreamExt;
 
 #[derive(Debug, Parser)]
 struct Args {
     /// The address to connect to.
-    #[clap(short, long, default_value = "http://localhost:3000/execute")]
+    #[clap(short, long, default_value = "http://localhost:3000")]
     address: String,
 
     /// The number of fibonacci numbers to compute.
@@ -30,27 +28,9 @@ async fn main() {
         stdin: stdin,
     };
 
-    let client = reqwest::Client::new();
-    let response: Vec<EventPayload> = client.post(args.address)
-        .json(&request)
-        .send()
-        .await
-        .expect("Failed to send request")
-        .bytes_stream()
-        .eventsource()
-        .map(|event| {
-            match event {
-                Ok(event) => serde_json::from_str(&event.data).expect("Failed to parse response"),
-                Err(e) => {
-                    panic!("Event stream error: {}", e);
-                }
-            }
-        })
-        .take(1)
-        .collect::<Vec<_>>()
-        .await;
+    let client = Client::new(&args.address);
 
-    assert_eq!(response.len(), 1);
+    let response = client.execute(request).await;
 
     println!("Response: {:#?}", response);
 }

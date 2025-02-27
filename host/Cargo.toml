@@ -26,6 +26,7 @@ path = "bin/validate_attestations.rs"
 [[example]]
 name = "fibonacci"
 path = "examples/fibonacci.rs"
+required-features = ["client"]
 
 [dependencies]
 sp1-tee-common = { workspace = true }
@@ -51,12 +52,15 @@ attestation-doc-validation = { git = "https://github.com/nhtyy/attestation-doc-v
 hex = "0.4.3"
 axum = "0.8.1"
 
+reqwest = { version = "0.11.0", features = ["json", "stream"], optional = true }
+eventsource-stream = { version = "0.2.0", optional = true }
+
 sp1-sdk = { workspace = true }
 futures = "0.3.31"
 
 [dev-dependencies]
-reqwest = { version = "0.11.0", features = ["json", "stream"] }
-eventsource-stream = "0.2.0"
+
 
 [features]
 production = []
+client = ["dep:reqwest", "dep:eventsource-stream"]

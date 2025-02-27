@@ -8,9 +8,18 @@ pub use attestations::{save_attestation, SaveAttestationArgs, SaveAttestationErr
 pub mod contract;
 pub use contract::TEEVerifier;
 
+/// The API for the host server.
 pub mod api;
 
+/// The host server implementation.
 pub mod server;
+
+/// A client for communicating with the host server.
+#[cfg(feature = "client")]
+pub mod client;
+
+#[cfg(feature = "client")]
+pub use client::{Client, ClientError};
 
 #[cfg(feature = "production")]
 pub const S3_BUCKET: &str = "sp1-tee-attestations";

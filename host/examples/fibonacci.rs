@@ -1,9 +1,9 @@
-use sp1_tee_host::api::{EventPayload, TEERequest, TEEResponse};
+use sp1_tee_host::api::{EventPayload, TEERequest};
 use sp1_sdk::SP1Stdin;
 use clap::Parser;
 
 use eventsource_stream::Eventsource;
-use futures::stream::{StreamExt, Stream};
+use futures::stream::StreamExt;
 
 #[derive(Debug, Parser)]
 struct Args {

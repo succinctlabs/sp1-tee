@@ -2,6 +2,9 @@ use sp1_tee_host::api::{TEERequest, TEEResponse};
 use sp1_sdk::SP1Stdin;
 use clap::Parser;
 
+use eventsource_stream::Eventsource;
+use futures::stream::{StreamExt, Stream};
+
 #[derive(Debug, Parser)]
 struct Args {
     /// The address to connect to.
@@ -28,14 +31,26 @@ async fn main() {
     };
 
     let client = reqwest::Client::new();
-    let response: TEEResponse = client.post(args.address)
+    let response: Vec<TEEResponse> = client.post(args.address)
         .json(&request)
         .send()
         .await
         .expect("Failed to send request")
-        .json()
-        .await
-        .expect("Failed to parse response");
+        .bytes_stream()
+        .eventsource()
+        .map(|event| {
+            match event {
+                Ok(event) => serde_json::from_str(&event.data).expect("Failed to parse response"),
+                Err(e) => {
+                    panic!("Failed to parse response: {}", e);
+                }
+            }
+        })
+        .take(1)
+        .collect::<Vec<_>>()
+        .await;
+
+    assert_eq!(response.len(), 1);
 
     println!("Response: {:#?}", response);
 }

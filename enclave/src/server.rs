@@ -250,6 +250,7 @@ impl Server {
         let (_, vk) = self.prover.setup(&program);
         debug_print!("Setup complete");
 
+        // Defaults `true` for deferred proof verification.
         match self.prover.execute(&program, &stdin).run() {
             Ok((public_values, _)) => {
                 debug_print!("Execute complete");

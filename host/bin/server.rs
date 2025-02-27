@@ -1,4 +1,9 @@
-use axum::{extract::State, routing::post, Json, Router};
+use axum::{
+    extract::State,
+    response::sse::{Event, Sse},
+    routing::post,
+    Json, Router,
+};
 use clap::Parser;
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse};
 use sp1_tee_host::server::{Server, ServerArgs, ServerError};
@@ -6,17 +11,20 @@ use sp1_tee_host::{
     api::{TEERequest, TEEResponse},
     HostStream,
 };
-use tracing_subscriber::EnvFilter;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
+use tracing_subscriber::EnvFilter;
+
+use futures::stream::{self, Stream, StreamExt};
 
 /// Initialize the tracing subscriber.
-/// 
+///
 /// The default filter is `sp1-tee-server=debug,info`.
 fn init_tracing() {
     let default_env_filter = EnvFilter::try_from_default_env().unwrap_or(
-        EnvFilter::from_str("sp1_tee_server=debug,sp1_tee_host=debug,info").expect("Failed to server default env filter")
+        EnvFilter::from_str("sp1_tee_server=debug,sp1_tee_host=debug,info")
+            .expect("Failed to server default env filter"),
     );
 
     tracing_subscriber::fmt()
@@ -70,11 +78,26 @@ async fn main() {
 async fn execute(
     State(server): State<Arc<Server>>,
     Json(request): Json<TEERequest>,
-) -> Result<Json<TEEResponse>, ServerError> {
+) -> Sse<impl Stream<Item = Result<Event, ServerError>>> {
     let _guard = server.execution_mutex.lock().await;
 
     tracing::info!("Executing request");
 
+    let response = execute_inner(server.clone(), request);
+    let response = stream::once(response).map(|response| match response {
+        Ok(resp) => Ok(Event::default()
+            .json_data(resp)
+            .expect("Failed to serialize response")),
+        Err(e) => Err(e),
+    });
+
+    Sse::new(response)
+}
+
+async fn execute_inner(
+    server: Arc<Server>,
+    request: TEERequest,
+) -> Result<TEEResponse, ServerError> {
     // Open a connection to the enclave.
     let mut stream = HostStream::new(server.cid, sp1_tee_common::ENCLAVE_PORT)
         .await
@@ -115,14 +138,13 @@ async fn execute(
             signature,
             recovery_id,
         } => {
-            // Return the response.
-            Ok(Json(TEEResponse {
+            Ok(TEEResponse {
                 vkey,
                 public_values,
                 signature,
-                // Add 27 to the recovery id, this follows from the EIP-2718 standard.
+                // Add 27 to the recovery id, as this is required by Ethereum.
                 recovery_id: recovery_id + 27,
-            }))
+            })
         }
         EnclaveResponse::Error(error) => {
             tracing::error!("Error from enclave: {:?}", error);

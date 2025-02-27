@@ -12,6 +12,11 @@ if [[ -z "$1" || ! $VALID_COMMANDS =~ " $1 " ]]; then
     echo "  run: Build and run the enclave"
     echo "  terminate: Terminate all enclaves"
     echo "  count: Count the number of enclaves running"
+    echo ""
+    echo "ENV: "
+    echo "  ENCLAVE_CPU_COUNT: The number of CPU cores to use for the enclave"
+    echo "  ENCLAVE_MEMORY: The amount of memory to use for the enclave"
+    echo "  ENCLAVE_CID: The CID to use for the enclave"
     exit 1
 fi
 
@@ -38,15 +43,18 @@ nitro-cli build-enclave --docker-uri sp1-tee:latest --output-file sp1-tee.eif
 
 # Setup default values if not set.
 if [ -z "$ENCLAVE_CPU_COUNT" ]; then
-    ENCLAVE_CPU_COUNT=2
+    echo "ENCLAVE_CPU_COUNT is not set, exiting..."
+    exit 1;
 fi
 
 if [ -z "$ENCLAVE_MEMORY" ]; then
-    ENCLAVE_MEMORY=700
+    echo "ENCLAVE_MEMORY is not set, exiting..."
+    exit 1;
 fi
 
 if [ -z "$ENCLAVE_CID" ]; then
-    ENCLAVE_CID=10
+    echo "ENCLAVE_CID is not set, exiting..."
+    exit 1;
 fi
 
 RUN_COMMAND="nitro-cli run-enclave --cpu-count $ENCLAVE_CPU_COUNT --memory $ENCLAVE_MEMORY --eif-path sp1-tee.eif --enclave-cid $ENCLAVE_CID"
@@ -58,6 +66,7 @@ if [[ $1 == "run" ]]; then
         $RUN_COMMAND --debug-mode
     else
         $RUN_COMMAND
+        exit 0
     fi
 
     # sleep for a bit to ensure the enclave is running.

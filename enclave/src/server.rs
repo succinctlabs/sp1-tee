@@ -159,7 +159,7 @@ impl Server {
                     Err(e) => {
                         stream
                             .send(EnclaveResponse::Error(format!(
-                                "Join error when executing program: {:?}",
+                                "Join error when executing program: {}",
                                 e
                             )))
                             .await

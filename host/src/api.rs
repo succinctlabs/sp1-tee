@@ -1,10 +1,13 @@
 use serde::{Deserialize, Serialize};
 use sp1_sdk::SP1Stdin;
 
-use axum::response::sse::Event;
 use k256::ecdsa::Signature;
 
-use crate::server::ServerError;
+#[cfg(feature = "server")]
+use {
+    crate::server::ServerError,
+    axum::response::sse::Event,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TEERequest {
@@ -27,12 +30,14 @@ pub enum EventPayload {
     Error(String),
 }
 
+#[cfg(feature = "server")]
 impl EventPayload {
     pub fn to_event(self) -> Event {
         Event::default().data(serde_json::to_string(&self).expect("Failed to serialize response"))
     }
 }
 
+#[cfg(feature = "server")]
 impl From<Result<TEEResponse, ServerError>> for EventPayload {
     fn from(response: Result<TEEResponse, ServerError>) -> Self {
         match response {

@@ -1,6 +1,8 @@
 use clap::Parser;
 use std::{path::Path, sync::Arc, time::Duration};
 
+pub mod stream;
+
 /// The directory of the manifest file.
 ///
 /// Used for locating the enclave.sh script.

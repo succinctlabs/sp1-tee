@@ -6,22 +6,27 @@ edition.workspace = true
 [[bin]]
 name = "sp1-tee-server"
 path = "bin/server.rs"
+required-features = ["server"]
 
 [[bin]]
 name = "vsock_test"
 path = "bin/vsock_test.rs"
+required-features = ["server"]
 
 [[bin]]
 name = "sp1-tee-setup"
 path = "bin/setup.rs"
+required-features = ["server"]
 
 [[bin]]
 name = "save_attestation"
 path = "bin/save_attestation.rs"
+required-features = ["attestations"]
 
 [[bin]]
-name = "validate_attestations"
-path = "bin/validate_attestations.rs"
+name = "validate_signers"
+path = "bin/validate_signers.rs"
+required-features = ["attestations"]
 
 [[example]]
 name = "fibonacci"
@@ -30,37 +35,50 @@ required-features = ["client"]
 
 [dependencies]
 sp1-tee-common = { workspace = true }
-tokio-vsock = { workspace = true }
+tokio-vsock = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
 clap = { workspace = true }
-tokio = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 k256 = { workspace = true }
-alloy = { version = "0.11.1", features = ["full", "signer-ledger"] }
 
-# Attestation Helpers
-aws-nitro-enclaves-cose = { version = "0.5" }
-aws-nitro-enclaves-nsm-api = { workspace = true }
-serde_json = "1.0.139"
-aws-config = "1.5.17"
-aws-sdk-s3 = "1.77.0"
+alloy = { version = "0.11.1", features = ["full"], optional = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-
-# todo: Move this to crates io when upstream release is done.
-attestation-doc-validation = { git = "https://github.com/nhtyy/attestation-doc-validation", branch = "main" }
 hex = "0.4.3"
-axum = "0.8.1"
+axum = { version = "0.8.1", optional = true }
 
+# Attestation Helpers
+aws-nitro-enclaves-cose = { version = "0.5", optional = true }
+aws-nitro-enclaves-nsm-api = { workspace = true, optional = true }
+serde_json = "1.0.139"
+aws-config = { version = "1.5.17", optional = true }
+aws-sdk-s3 = { version = "1.77.0", optional = true }
+attestation-doc-validation = { git = "https://github.com/nhtyy/attestation-doc-validation", branch = "main", optional = true }
+
+# Client Helpers
 reqwest = { version = "0.11.0", features = ["json", "stream"], optional = true }
 eventsource-stream = { version = "0.2.0", optional = true }
+futures = { version = "0.3.31", optional = true }
 
+# SDK Helpers
 sp1-sdk = { workspace = true }
-futures = "0.3.31"
 
 [dev-dependencies]
-
+tokio = { workspace = true }
 
 [features]
+default = ["server"]
+# Use production constants.
 production = []
-client = ["dep:reqwest", "dep:eventsource-stream"]
+server = ["attestations", "dep:axum", "dep:tokio-vsock", "dep:tokio", "dep:futures"]
+attestations = [
+    "dep:aws-config",
+    "dep:aws-sdk-s3",
+    "dep:alloy",
+    "dep:aws-nitro-enclaves-cose",
+    "dep:aws-nitro-enclaves-nsm-api",
+    "dep:attestation-doc-validation",
+]
+client = ["dep:reqwest", "dep:eventsource-stream", "dep:futures"]

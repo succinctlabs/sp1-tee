@@ -7,15 +7,36 @@ use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Error;
 use aws_sdk_s3::primitives::ByteStreamError;
 use aws_sdk_s3::{error::SdkError, operation::put_object::PutObjectError};
+use aws_config::{BehaviorVersion, Region};
 use sp1_tee_common::{CommunicationError, EnclaveRequest, EnclaveResponse};
 
 use aws_nitro_enclaves_nsm_api::api::AttestationDoc;
 
 use crate::ethereum_address_from_encoded_point;
-use crate::{s3_client, HostStream};
+use crate::HostStream;
 
 // Resubmit the attestation every 12 hours
 pub const ATTESTATION_INTERVAL: Duration = Duration::from_secs(12 * 60 * 60);
+
+/// Creates an S3 client from the environment variables.
+/// 
+/// For EC2 instances, the environment variables are set automatically.
+/// 
+/// # Panics
+/// 
+/// This function will panic if the environment variables are not set.
+pub async fn s3_client() -> aws_sdk_s3::Client {
+    // Loads from environment variables.
+    let aws_config = aws_config::defaults(BehaviorVersion::latest())
+        // buckets are in us-east-1
+        .region(Region::new("us-east-1"))
+        .load()
+        .await;
+
+    // Create the S3 client.
+    aws_sdk_s3::Client::new(&aws_config)
+}
+
 
 #[derive(Debug)]
 pub struct SaveAttestationArgs {
@@ -128,6 +149,17 @@ pub struct RawAttestation {
     pub attestation: Vec<u8>,
 }
 
+/// Tries to fetch all attestations from S3.
+/// 
+/// # Errors 
+/// - [`GetAttestationError::ListAttestationsError`] - Failed to list attestations.
+/// - [`GetAttestationError::S3GetObjectError`] - Failed to get an object.
+/// - [`GetAttestationError::ParseAddressError`] - Failed to parse an address.
+/// - [`GetAttestationError::ByteStreamError`] - Failed to collect the byte stream.
+/// 
+/// # Panics
+/// 
+/// See [`s3_client`] for more details.
 pub async fn get_raw_attestations() -> Result<Vec<RawAttestation>, GetAttestationError> {
     let s3_client = s3_client().await;
 

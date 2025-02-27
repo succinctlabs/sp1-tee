@@ -33,23 +33,6 @@ pub enum ServerError {
     ProgramTooLarge(usize),
 }
 
-impl IntoResponse for ServerError {
-    fn into_response(self) -> axum::response::Response {
-        match self {
-            ServerError::StdinTooLarge(_) => {
-                (StatusCode::PAYLOAD_TOO_LARGE, self.to_string()).into_response()
-            }
-            ServerError::ProgramTooLarge(_) => {
-                (StatusCode::PAYLOAD_TOO_LARGE, self.to_string()).into_response()
-            }
-            ServerError::EnclaveError(_) => {
-                (StatusCode::BAD_REQUEST, self.to_string()).into_response()
-            }
-            _ => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()).into_response(),
-        }
-    }
-}
-
 pub struct Server {
     pub execution_mutex: tokio::sync::Mutex<()>,
     pub cid: u32,

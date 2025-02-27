@@ -6,13 +6,16 @@ use axum::{
 };
 use clap::Parser;
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse};
-use sp1_tee_host::server::{Server, ServerArgs, ServerError};
+use sp1_tee_host::{
+    api::EventPayload,
+    server::{Server, ServerArgs, ServerError},
+};
 use sp1_tee_host::{
     api::{TEERequest, TEEResponse},
     HostStream,
 };
-use std::str::FromStr;
 use std::sync::Arc;
+use std::{convert::Infallible, str::FromStr};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
@@ -78,18 +81,14 @@ async fn main() {
 async fn execute(
     State(server): State<Arc<Server>>,
     Json(request): Json<TEERequest>,
-) -> Sse<impl Stream<Item = Result<Event, ServerError>>> {
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let _guard = server.execution_mutex.lock().await;
 
     tracing::info!("Executing request");
 
     let response = execute_inner(server.clone(), request);
-    let response = stream::once(response).map(|response| match response {
-        Ok(resp) => Ok(Event::default()
-            .json_data(resp)
-            .expect("Failed to serialize response")),
-        Err(e) => Err(e),
-    });
+    let response =
+        stream::once(response).map(|response| Ok(EventPayload::from(response).to_event()));
 
     Sse::new(response)
 }

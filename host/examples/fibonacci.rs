@@ -1,4 +1,4 @@
-use sp1_tee_host::api::{TEERequest, TEEResponse};
+use sp1_tee_host::api::{EventPayload, TEERequest, TEEResponse};
 use sp1_sdk::SP1Stdin;
 use clap::Parser;
 
@@ -31,7 +31,7 @@ async fn main() {
     };
 
     let client = reqwest::Client::new();
-    let response: Vec<TEEResponse> = client.post(args.address)
+    let response: Vec<EventPayload> = client.post(args.address)
         .json(&request)
         .send()
         .await
@@ -42,7 +42,7 @@ async fn main() {
             match event {
                 Ok(event) => serde_json::from_str(&event.data).expect("Failed to parse response"),
                 Err(e) => {
-                    panic!("Failed to parse response: {}", e);
+                    panic!("Event stream error: {}", e);
                 }
             }
         })

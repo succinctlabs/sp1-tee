@@ -70,11 +70,7 @@ contract SP1TeeVerifier is ISP1VerifierWithHash, SimpleOwnable {
     ///
     /// @dev For more information about signature related attacks see:
     ///      https://scsfg.io/hackers/signature-attacks
-    function verifyProof(
-        bytes32 programVKey,
-        bytes calldata publicValues,
-        bytes calldata proofBytes
-    ) external view {
+    function verifyProof(bytes32 programVKey, bytes calldata publicValues, bytes calldata proofBytes) external view {
         bytes4 receivedSelector = bytes4(proofBytes[:4]);
         bytes4 expectedSelector = bytes4(VERIFIER_HASH());
         if (receivedSelector != expectedSelector) {

@@ -32,7 +32,7 @@ contract SP1TeeTest is Test {
     function setUp() public {
         iterableMapTest = new IterableMapTest();
     }
-    
+
     function test_addOneSigner() public {
         iterableMapTest.setSigner(address(1));
         assertEq(iterableMapTest.getSignersLength(), 1);
@@ -68,7 +68,7 @@ contract SP1TeeTest is Test {
         }
 
         assertEq(iterableMapTest.getSignersLength(), 5);
-        
+
         // push another signer
         iterableMapTest.setSigner(address(uint160(10)));
         assertEq(iterableMapTest.getSignersLength(), 6);

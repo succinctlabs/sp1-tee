@@ -15,8 +15,8 @@ contract CounterScript is Script {
         vm.stopBroadcast();
 
         string memory deploymentOutfile =
-                string.concat(vm.projectRoot(), "/deployments/", vm.toString(block.chainid), ".json");
-        
+            string.concat(vm.projectRoot(), "/deployments/", vm.toString(block.chainid), ".json");
+
         vm.writeFile(deploymentOutfile, "");
         vm.writeJson({json: vm.serializeAddress("", "SP1TeeVerifier", address(sp1TeeVerifier)), path: deploymentOutfile});
     }

@@ -14,7 +14,7 @@ contract SimpleOwnable {
     event OwnershipRenounced(address indexed previousOwner);
 
     /// @notice Initializes the owner.
-    /// 
+    ///
     /// @dev The owner is the msg.sender.
     constructor() {
         owner = msg.sender;
@@ -30,7 +30,7 @@ contract SimpleOwnable {
     }
 
     /// @notice Changes the owner.
-    /// 
+    ///
     /// @dev Only the owner can change the owner.
     function transferOwnership(address newOwner) external onlyOwner {
         if (newOwner == address(0)) {
@@ -43,7 +43,7 @@ contract SimpleOwnable {
     }
 
     /// @notice Renounces the owner role.
-    /// 
+    ///
     /// @dev Only the owner can renounce the owner role.
     function renounceOwnership() external onlyOwner {
         owner = address(0);

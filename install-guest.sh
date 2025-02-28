@@ -3,6 +3,7 @@
 
 #
 # Installs the deps needed to build the `aws-nitro-enclave-c-sdk` and the `sp1-tee-enclave` crate.
+# This script is intended to be run inside the enclave docker container, NOT on the host machine.
 # 
 # Dependencies:
 # 1. aws-lc
@@ -32,7 +33,8 @@ sudo yum install -y \
 	gcc-c++ \
 	go \
 	ninja-build \
-	doxygen
+	doxygen \
+	openssl-devel
 
 # Install the rust toolchain.
 curl https://sh.rustup.rs -sSf | sh -s -- -y

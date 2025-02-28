@@ -1,6 +1,8 @@
 # ---- Build Stage ----
 FROM public.ecr.aws/amazonlinux/amazonlinux:2023 AS builder
 
+ARG DEBUG_MODE=0
+
 # Install system dependencies required to build Rust projects
 RUN yum update -y \
     && yum install -y gcc clang
@@ -12,12 +14,12 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 WORKDIR app
 
-COPY install-deps.sh ./
+COPY install-guest.sh ./
 
-# Make sure your install-deps script is executable and run it
-RUN sed -i 's/sudo //g' ./install-deps.sh
-RUN chmod +x ./install-deps.sh
-RUN ./install-deps.sh
+# Make sure your install-guest script is executable and run it
+RUN sed -i 's/sudo //g' ./install-guest.sh
+RUN chmod +x ./install-guest.sh
+RUN ./install-guest.sh
 
 # Copy the entire Rust workspace into /app
 COPY . ./
@@ -25,7 +27,11 @@ COPY . ./
 # Sanity check that cmake is installed.
 RUN cmake --version
 
-RUN cargo build --release --bin sp1-tee-enclave
+RUN if [ "${DEBUG_MODE}" -eq "1" ]; then \
+        cargo build --release --bin sp1-tee-enclave --features debug-mode; \
+    else \
+        cargo build --release --bin sp1-tee-enclave; \
+    fi
 
 # ---- Runtime Stage ----
 FROM public.ecr.aws/amazonlinux/amazonlinux:2023
@@ -34,4 +40,4 @@ FROM public.ecr.aws/amazonlinux/amazonlinux:2023
 COPY --from=builder /app/target/release/sp1-tee-enclave /usr/local/bin/sp1-tee-enclave
 
 # Set the entrypoint to the enclave binary.
-ENTRYPOINT ["/usr/local/bin/sp1-tee-enclave", "--port", "5005", "--enc-key-arn", "todo"]
+ENTRYPOINT ["/usr/local/bin/sp1-tee-enclave", "--enc-key-arn", "none"]

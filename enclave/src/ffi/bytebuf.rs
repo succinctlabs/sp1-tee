@@ -65,7 +65,7 @@ impl Drop for AWSByteBuf {
             // 
             // - The capacity is assumed to be correct
             // 
-            // - The buffer is assumed to be properly aligned.
+            // - The buffer is assumed to be properly aligned, since its created by Rust code.
             // 
             // - `u8` has noop destructor, no need to call drop.
             unsafe {

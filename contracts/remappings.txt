@@ -1,0 +1,8 @@
+@solarity/=lib/nitro-validator/lib/solidity-lib/contracts/
+ds-test/=lib/sp1-contracts/contracts/lib/openzeppelin-contracts/lib/forge-std/lib/ds-test/src/
+erc4626-tests/=lib/sp1-contracts/contracts/lib/openzeppelin-contracts/lib/erc4626-tests/
+forge-std/=lib/forge-std/src/
+nitro-validator/=lib/nitro-validator/src/
+openzeppelin-contracts/=lib/sp1-contracts/contracts/lib/openzeppelin-contracts/
+solidity-lib/=lib/nitro-validator/lib/solidity-lib/contracts/
+sp1-contracts/=lib/sp1-contracts/contracts/

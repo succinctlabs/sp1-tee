@@ -5,6 +5,10 @@ import {ISP1Verifier, ISP1VerifierWithHash} from "sp1-contracts/src/ISP1Verifier
 import {SimpleOwnable} from "./SimpleOwnable.sol";
 import {IterableMap, SignersMap} from "./SignersMap.sol";
 
+/// @title SP1 Tee Verifier
+/// @author Succinct Labs
+/// @notice This contract is a wrapper around any SP1 verifier that additionaly verifies
+///         a signature over the public values and program vkey.
 contract SP1TeeVerifier is ISP1VerifierWithHash, SimpleOwnable {
     using IterableMap for SignersMap;
 

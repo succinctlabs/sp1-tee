@@ -35,6 +35,9 @@ contract SP1TeeVerifier is ISP1VerifierWithHash, SimpleOwnable {
     ///
     /// @dev Only the owner can add a signer.
     function addSigner(address signer) external onlyOwner {
+        if (signer == address(0)) {
+            revert("Signer cannot be the zero address");
+        }
         signersMap.addSigner(signer);
     }
 

@@ -46,8 +46,9 @@ contract SimpleOwnable {
     ///
     /// @dev Only the owner can renounce the owner role.
     function renounceOwnership() external onlyOwner {
+        address previousOwner = owner;
         owner = address(0);
 
-        emit OwnershipRenounced(owner);
+        emit OwnershipRenounced(previousOwner);
     }
 }

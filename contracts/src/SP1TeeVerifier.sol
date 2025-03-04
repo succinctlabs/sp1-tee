@@ -5,15 +5,11 @@ import {ISP1Verifier, ISP1VerifierWithHash} from "sp1-contracts/src/ISP1Verifier
 import {SimpleOwnable} from "./SimpleOwnable.sol";
 import {IterableMap, SignersMap} from "./SignersMap.sol";
 
-interface Ownable {
-    function owner() external view returns (address);
-}
-
 /// @title SP1 Tee Verifier
 /// @author Succinct Labs
 /// @notice This contract is a wrapper around any SP1 verifier that additionally verifies
 ///         a signature over the public values and program vkey.
-contract SP1TeeVerifier is ISP1VerifierWithHash {
+contract SP1TeeVerifier is ISP1VerifierWithHash, SimpleOwnable {
     using IterableMap for SignersMap;
 
     /// @notice Thrown when the proof bytes appear to be invalid.
@@ -28,23 +24,11 @@ contract SP1TeeVerifier is ISP1VerifierWithHash {
     /// @notice The signers map.
     SignersMap signersMap;
 
-    /// @notice The SP1 verifier gateway contract.
-    ISP1Verifier public immutable gateway;
+    /// @notice The version of the verifier.
+    uint256 public constant VERSION = 1;
 
-    /// @notice Modifier to ensure the caller is the gateway owner.
-    ///
-    /// @dev Better to reuse the owner to simplify upgrade scope.
-    modifier onlyOwner() {
-        if (msg.sender != Ownable(address(gateway)).owner()) {
-            revert("Only the gateway owner can call this function");
-        }
-
-        _;
-    }
-
-    constructor(address _gateway) {
-        gateway = ISP1Verifier(_gateway);
-    }
+    /// @notice Initializes the verifier, as well as the owner.
+    constructor(address _owner) SimpleOwnable(_owner) {}
 
     /// @notice Adds a signer to the list of signers, after validating an attestation.
     ///
@@ -79,7 +63,7 @@ contract SP1TeeVerifier is ISP1VerifierWithHash {
     ///
     /// @dev Since this is not a "real verifier" this is merely a constant used for identification.
     function VERIFIER_HASH() public pure returns (bytes32) {
-        return keccak256(abi.encodePacked("SP1TeeVerifier"));
+        return keccak256(abi.encodePacked("SP1TeeVerifier", abi.encode(VERSION)));
     }
 
     /// @notice Verifies a proof with given public values and vkey.
@@ -126,6 +110,8 @@ contract SP1TeeVerifier is ISP1VerifierWithHash {
 
         // The TEE verification was successful, callback into the gateway
         // with the proof bytes stripped of the signature.
-        gateway.verifyProof(programVKey, publicValues, proofBytes[69:]);
+        //
+        // Note: Assumes the caller is an ISP1Verifier.
+        ISP1Verifier(msg.sender).verifyProof(programVKey, publicValues, proofBytes[69:]);
     }
 }

@@ -14,8 +14,8 @@ contract SimpleOwnable {
     /// @notice Initializes the owner.
     ///
     /// @dev The owner is the msg.sender.
-    constructor() {
-        owner = msg.sender;
+    constructor(address _owner) {
+        owner = _owner;
     }
 
     /// @notice Only the owner can call the function.

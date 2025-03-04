@@ -136,7 +136,7 @@ async fn execute(
 
     let response = execute_inner(server.clone(), request);
     let response =
-        stream::once(response).map(|response| Ok(EventPayload::from(response).to_event()));
+        stream::once(response).map(|response| Ok(sp1_tee_host::api::result_to_event(response)));
 
     Sse::new(response)
 }

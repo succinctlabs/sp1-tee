@@ -1,54 +1,24 @@
-use alloy::primitives::Address;
-use serde::{Deserialize, Serialize};
-use sp1_sdk::SP1Stdin;
-
-use k256::ecdsa::Signature;
+pub use sp1_sdk::network::tee::api::{TEEResponse, TEERequest, GetAddressResponse, EventPayload};
 
 #[cfg(feature = "server")]
-use {
-    crate::server::ServerError,
-    axum::response::sse::Event,
-};
+use {crate::server::ServerError, axum::response::sse::Event};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TEERequest {
-    pub id: [u8; 32],
-    pub program: Vec<u8>,
-    pub stdin: SP1Stdin,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TEEResponse {
-    pub vkey: [u8; 32],
-    pub public_values: Vec<u8>,
-    pub signature: Signature,
-    pub recovery_id: u8,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GetAddressResponse {
-    pub address: Address,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum EventPayload {
-    Success(TEEResponse),
-    Error(String),
+#[cfg(feature = "server")]
+pub(crate) fn event_payload_to_event(payload: EventPayload) -> Event {
+    Event::default().data(hex::encode(
+        bincode::serialize(&payload).expect("Failed to serialize response"),
+    ))
 }
 
 #[cfg(feature = "server")]
-impl EventPayload {
-    pub fn to_event(self) -> Event {
-        Event::default().data(serde_json::to_string(&self).expect("Failed to serialize response"))
+pub(crate) fn result_to_event_payload(response: Result<TEEResponse, ServerError>) -> EventPayload {
+    match response {
+        Ok(response) => EventPayload::Success(response),
+        Err(error) => EventPayload::Error(error.to_string()),
     }
 }
 
 #[cfg(feature = "server")]
-impl From<Result<TEEResponse, ServerError>> for EventPayload {
-    fn from(response: Result<TEEResponse, ServerError>) -> Self {
-        match response {
-            Ok(response) => Self::Success(response),
-            Err(error) => Self::Error(error.to_string()),
-        }
-    }
+pub fn result_to_event(response: Result<TEEResponse, ServerError>) -> Event {
+    event_payload_to_event(result_to_event_payload(response))
 }

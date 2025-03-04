@@ -23,11 +23,8 @@ pub mod server;
 #[cfg(feature = "server")]
 pub use server::stream::HostStream;
 
-/// A client for communicating with the host server.
 #[cfg(feature = "client")]
-pub mod client;
-#[cfg(feature = "client")]
-pub use client::{Client, ClientError};
+pub use sp1_sdk::network::tee::client::{Client, ClientError};
 
 #[cfg(feature = "production")]
 pub const S3_BUCKET: &str = "sp1-tee-attestations";

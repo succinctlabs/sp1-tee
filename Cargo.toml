@@ -24,4 +24,4 @@ aws-nitro-enclaves-nsm-api = "0.4.0"
 tracing = "0.1.41"
 
 # sp1
-sp1-sdk = "4.0.0"
+sp1-sdk = { git = "https://github.com/succinctlabs/sp1-wip", branch = "n/tee-proofs" }

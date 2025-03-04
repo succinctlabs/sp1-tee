@@ -1,5 +1,5 @@
 use sp1_tee_host::api::TEERequest;
-use sp1_tee_host::client::Client;
+use sp1_tee_host::Client;
 use sp1_sdk::SP1Stdin;
 use clap::Parser;
 

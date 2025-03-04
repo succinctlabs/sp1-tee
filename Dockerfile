@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.4
+
 # ---- Build Stage ----
 FROM public.ecr.aws/amazonlinux/amazonlinux:2023 AS builder
 
@@ -12,8 +14,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 # TEMPORARY: Use ssh key for private repos.
 RUN git config --global url."ssh://git@github.com".insteadOf "https://github.com"
-RUN --mount=type=ssh \
-    mkdir -p ~/.ssh
+RUN mkdir -p ~/.ssh
 RUN touch ~/.ssh/known_hosts
 RUN ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
 
@@ -26,7 +27,7 @@ COPY install-guest.sh ./
 # Make sure your install-guest script is executable and run it
 RUN sed -i 's/sudo //g' ./install-guest.sh
 RUN chmod +x ./install-guest.sh
-RUN ./install-guest.sh
+RUN --mount=type=ssh ./install-guest.sh
 
 # Copy the entire Rust workspace into /app
 COPY . ./
@@ -35,9 +36,9 @@ COPY . ./
 RUN cmake --version
 
 RUN if [ "${DEBUG_MODE}" -eq "1" ]; then \
-        cargo build --release --bin sp1-tee-enclave --features debug-mode; \
+        --mount=type=ssh cargo build --release --bin sp1-tee-enclave --features debug-mode; \
     else \
-        cargo build --release --bin sp1-tee-enclave; \
+        --mount=type=ssh cargo build --release --bin sp1-tee-enclave; \
     fi
 
 # ---- Runtime Stage ----

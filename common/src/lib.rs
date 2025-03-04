@@ -8,6 +8,9 @@ pub use communication::{VsockStream, CommunicationError};
 /// So its OK to hardcode the port here.
 pub const ENCLAVE_PORT: u16 = 5005;
 
+/// The CID of the enclave.
+pub const ENCLAVE_CID: u32 = 10;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum EnclaveRequest {
     /// Print from the enclave to the debug console.

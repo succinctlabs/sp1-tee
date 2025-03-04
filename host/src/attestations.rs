@@ -54,7 +54,7 @@ impl Default for SaveAttestationArgs {
     fn default() -> Self {
         Self {
             cid: 10,
-            port: 5005,
+            port: sp1_tee_common::ENCLAVE_PORT,
             bucket: crate::S3_BUCKET.to_string(),
         }
     }

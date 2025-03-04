@@ -5,10 +5,8 @@ pragma solidity ^0.8.20;
 struct SignersMap {
     /// @dev Whether the address is a signer.
     mapping(address => bool) map;
-
     /// @dev The list of signers.
     address[] signers;
-
     /// @dev Keep track of the index of the signer in the `signers` array.
     /// @dev This way if we need to remove the signer, we can do so in constant time.
     mapping(address => uint256) signerIndex;

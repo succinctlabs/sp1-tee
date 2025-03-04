@@ -54,7 +54,7 @@ pub struct ServerArgs {
     pub address: String,
 
     /// The CID and port of the enclave to connect to.
-    #[clap(long, default_value = "10")]
+    #[clap(long, default_value_t = sp1_tee_common::ENCLAVE_CID)]
     pub enclave_cid: u32,
 
     /// The number of cores to use for the enclave.

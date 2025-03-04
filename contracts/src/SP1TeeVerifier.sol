@@ -32,7 +32,7 @@ contract SP1TeeVerifier is ISP1VerifierWithHash {
     ISP1Verifier public immutable gateway;
 
     /// @notice Modifier to ensure the caller is the gateway owner.
-    /// 
+    ///
     /// @dev Better to reuse the owner to simplify upgrade scope.
     modifier onlyOwner() {
         if (msg.sender != Ownable(address(gateway)).owner()) {

@@ -46,7 +46,7 @@ impl Server {
 #[derive(Parser)]
 pub struct ServerArgs {
     /// The port to listen on.
-    #[clap(short, long, default_value = "3000")]
+    #[clap(short, long, default_value = "80")]
     pub port: u16,
 
     /// The address to listen on.
@@ -58,11 +58,11 @@ pub struct ServerArgs {
     pub enclave_cid: u32,
 
     /// The number of cores to use for the enclave.
-    #[clap(long, default_value = "16")]
+    #[clap(long, default_value = "12")]
     pub enclave_cores: u32,
 
     /// The memory to use for the enclave.
-    #[clap(short, long, default_value = "5000")]
+    #[clap(short, long, default_value = "9000")]
     pub enclave_memory: u32,
 
     /// Run the enclave in debug mode.

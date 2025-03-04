@@ -1,15 +1,13 @@
 use axum::{
     extract::State,
-    response::{
-        sse::{Event, Sse},
-    },
+    response::sse::{Event, Sse},
     routing::{get, post},
     Json, Router,
 };
 use clap::Parser;
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse};
 use sp1_tee_host::{
-    api::{EventPayload, GetAddressResponse},
+    api::GetAddressResponse,
     server::{Server, ServerArgs, ServerError},
 };
 use sp1_tee_host::{
@@ -44,6 +42,11 @@ async fn main() {
     init_tracing();
 
     let args = ServerArgs::parse();
+
+    // First, kill any existing enclaves.
+    // 
+    // Just in case the server was killed uncleanly last time.
+    sp1_tee_host::server::terminate_enclaves();
 
     // Start the server.
     //

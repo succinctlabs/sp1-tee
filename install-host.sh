@@ -28,7 +28,16 @@ git submodule update --init --recursive
 # Copy the allocator template to the Nitro Enclaves config directory.
 sudo cp allocator.template.yaml /etc/nitro_enclaves/allocator.yaml
 
-# Restart the Nitro Enclaves Allocator service.
+# Restart the Nitro Enclaves Allocator service to pick up the new allocator config.
 sudo systemctl restart nitro-enclaves-allocator.service
+
+# Install the tee server binary.
+cargo install --path host --bin sp1-tee-server
+
+# Copy the tee-service template to the systemd directory.
+sudo cp tee-service.template.service /etc/systemd/system/tee-service.service
+
+# Enable and start the tee-service.
+sudo systemctl enable --now tee-service.service
 
 echo "Done installing Nitro Enclaves CLI, exit the session and login again for changes to take effect."

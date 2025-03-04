@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import {ISP1Verifier, ISP1VerifierWithHash} from "sp1-contracts/src/ISP1Verifier.sol";

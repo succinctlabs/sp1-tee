@@ -1,7 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-
-// TODO: Inspired by op-enclave owner management.
 
 contract SimpleOwnable {
     /// @notice The owner of the contract.

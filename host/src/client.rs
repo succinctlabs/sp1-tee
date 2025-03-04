@@ -1,6 +1,7 @@
 use reqwest::{Client as HttpClient, Error as HttpError, Url};
 use eventsource_stream::{Eventsource, EventStreamError};
 use futures::stream::StreamExt;
+
 use crate::api::{TEERequest, TEEResponse, EventPayload};
 
 #[derive(Debug, thiserror::Error)]

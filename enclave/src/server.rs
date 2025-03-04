@@ -18,6 +18,9 @@ enum ConnectionState {
     Close,
 }
 
+/// Macro for printing debug messages.
+///
+/// Only prints if the `debug-mode` feature is enabled.
 macro_rules! debug_print {
     ($($tt:tt)*) => {
         #[cfg(feature = "debug-mode")]
@@ -122,8 +125,15 @@ impl Server {
         stream: &mut VsockStream<EnclaveRequest, EnclaveResponse>,
     ) -> ConnectionState {
         match message {
+            #[cfg(feature = "debug-mode")]
             EnclaveRequest::Print(message) => {
                 debug_print!("{}", message);
+
+                let _ = stream.send(EnclaveResponse::Ack);
+            }
+            #[cfg(not(feature = "debug-mode"))]
+            EnclaveRequest::Print(_) => {
+                // Outside of debug mode the console cannot be accessed.
 
                 let _ = stream.send(EnclaveResponse::Ack);
             }

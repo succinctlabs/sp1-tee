@@ -5,10 +5,17 @@ ARG DEBUG_MODE=0
 
 # Install system dependencies required to build Rust projects
 RUN yum update -y \
-    && yum install -y gcc clang
+    && yum install -y gcc clang git
 
 # Install Rust via rustup
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+# TEMPORARY: Use ssh key for private repos.
+RUN git config --global url."ssh://git@github.com".insteadOf "https://github.com"
+RUN --mount=type=ssh \
+    mkdir -p ~/.ssh
+RUN touch ~/.ssh/known_hosts
+RUN ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
 
 ENV PATH="/root/.cargo/bin:${PATH}"
 

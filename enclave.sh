@@ -33,9 +33,9 @@ fi
 
 # Always build the enclave from scratch.
 if [[ $2 == "-f" || $2 == "--debug" ]]; then
-    docker build --build-arg DEBUG_MODE=1 -t sp1-tee .
+    docker build --volume "$SSH_AUTH_SOCK:$SSH_AUTH_SOCK" -e SSH_AUTH_SOCK=$SSH_AUTH_SOCK --build-arg DEBUG_MODE=1 -t sp1-tee .
 else
-    docker build -t sp1-tee .
+    docker build --volume "$SSH_AUTH_SOCK:$SSH_AUTH_SOCK" -e SSH_AUTH_SOCK=$SSH_AUTH_SOCK -t sp1-tee .
 fi
 
 # Create the EIF from the enclave.

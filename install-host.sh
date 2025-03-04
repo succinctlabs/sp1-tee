@@ -31,14 +31,14 @@ sudo cp allocator.template.yaml /etc/nitro_enclaves/allocator.yaml
 # Restart the Nitro Enclaves Allocator service to pick up the new allocator config.
 sudo systemctl restart nitro-enclaves-allocator.service
 
-# Install the tee server binary.
-cargo install --path host --bin sp1-tee-server --features production
-
 # Copy the tee-service template to the systemd directory.
 sudo cp tee-service.template.service /etc/systemd/system/tee-service.service
 
 # Enable and start the tee-service if the --production flag is passed.
 if [ "$1" = "--production" ]; then
+    # Install the tee server binary.
+    cargo install --path host --bin sp1-tee-server --features production
+    
     sudo systemctl enable --now tee-service.service
 else 
     echo "In order to start the tee-service automatically, you must pass the --production flag."

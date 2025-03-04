@@ -64,4 +64,14 @@ impl Client {
             EventPayload::Error(error) => Err(ClientError::ServerError(error)),
         }
     }
+
+    pub async fn get_address(&self) -> Result<Address, ClientError> {
+        let response = self.client.get(format!("{}/address", self.url))
+            .send()
+            .await?
+            .json::<GetAddressResponse>()
+            .await?;
+
+        Ok(response.address)
+    }
 }

@@ -1,3 +1,4 @@
+use alloy::primitives::Address;
 use serde::{Deserialize, Serialize};
 use sp1_sdk::SP1Stdin;
 
@@ -22,6 +23,11 @@ pub struct TEEResponse {
     pub public_values: Vec<u8>,
     pub signature: Signature,
     pub recovery_id: u8,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetAddressResponse {
+    pub address: Address,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

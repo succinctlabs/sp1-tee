@@ -1,5 +1,6 @@
 use clap::Parser;
 use std::{path::Path, sync::Arc, time::Duration};
+use axum::{response::IntoResponse, http::StatusCode, response::Response};
 
 pub mod stream;
 
@@ -7,30 +8,6 @@ pub mod stream;
 ///
 /// Used for locating the enclave.sh script.
 const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
-
-#[derive(Debug, thiserror::Error)]
-pub enum ServerError {
-    #[error("Failed to connect to enclave")]
-    FailedToConnectToEnclave,
-
-    #[error("Failed to send request to enclave")]
-    FailedToSendRequestToEnclave,
-
-    #[error("Failed to receive response from enclave")]
-    FailedToReceiveResponseFromEnclave,
-
-    #[error("Unexpected response from enclave")]
-    UnexpectedResponseFromEnclave,
-
-    #[error("Enclave error: {0}")]
-    EnclaveError(String),
-
-    #[error("Stdin is too large, found {0} bytes")]
-    StdinTooLarge(usize),
-
-    #[error("Program is too large, found {0} bytes")]
-    ProgramTooLarge(usize),
-}
 
 pub struct Server {
     pub execution_mutex: tokio::sync::Mutex<()>,
@@ -91,6 +68,48 @@ pub struct ServerArgs {
     /// Run the enclave in debug mode.
     #[clap(short, long)]
     pub debug: bool,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ServerError {
+    #[error("Failed to connect to enclave")]
+    FailedToConnectToEnclave,
+
+    #[error("Failed to send request to enclave")]
+    FailedToSendRequestToEnclave,
+
+    #[error("Failed to receive response from enclave")]
+    FailedToReceiveResponseFromEnclave,
+
+    #[error("Unexpected response from enclave")]
+    UnexpectedResponseFromEnclave,
+
+    #[error("Failed to convert public key to address")]
+    FailedToConvertPublicKeyToAddress,
+
+    #[error("Enclave error: {0}")]
+    EnclaveError(String),
+
+    #[error("Stdin is too large, found {0} bytes")]
+    StdinTooLarge(usize),
+
+    #[error("Program is too large, found {0} bytes")]
+    ProgramTooLarge(usize),
+}
+
+impl IntoResponse for ServerError {
+    fn into_response(self) -> Response {
+        match self {
+            ServerError::FailedToConnectToEnclave => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to connect to enclave").into_response(),
+            ServerError::FailedToSendRequestToEnclave => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to send request to enclave").into_response(),
+            ServerError::FailedToReceiveResponseFromEnclave => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to receive response from enclave").into_response(),
+            ServerError::UnexpectedResponseFromEnclave => (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected response from enclave").into_response(),
+            ServerError::FailedToConvertPublicKeyToAddress => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to convert public key to address, this is a bug.").into_response(),
+            ServerError::EnclaveError(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
+            ServerError::StdinTooLarge(size) => (StatusCode::PAYLOAD_TOO_LARGE, format!("Stdin is too large, found {} bytes", size)).into_response(),
+            ServerError::ProgramTooLarge(size) => (StatusCode::PAYLOAD_TOO_LARGE, format!("Program is too large, found {} bytes", size)).into_response(),
+        }
+    }
 }
 
 /// Start the enclave.

@@ -1,13 +1,15 @@
 use axum::{
     extract::State,
-    response::sse::{Event, Sse},
-    routing::post,
+    response::{
+        sse::{Event, Sse},
+    },
+    routing::{get, post},
     Json, Router,
 };
 use clap::Parser;
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse};
 use sp1_tee_host::{
-    api::EventPayload,
+    api::{EventPayload, GetAddressResponse},
     server::{Server, ServerArgs, ServerError},
 };
 use sp1_tee_host::{
@@ -50,6 +52,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/execute", post(execute))
+        .route("/address", get(get_address))
         .with_state(server);
 
     let listener = TcpListener::bind((args.address.clone(), args.port))
@@ -70,6 +73,51 @@ async fn main() {
 
             sp1_tee_host::server::terminate_enclaves();
             std::process::exit(0);
+        }
+    }
+}
+
+async fn get_address(
+    State(server): State<Arc<Server>>,
+) -> Result<Json<GetAddressResponse>, ServerError> {
+    let mut stream = HostStream::new(server.cid, sp1_tee_common::ENCLAVE_PORT)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to connect to enclave: {}", e);
+
+            ServerError::FailedToConnectToEnclave
+        })?;
+
+    stream
+        .send(EnclaveRequest::GetPublicKey)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to send request to enclave: {}", e);
+
+            ServerError::FailedToSendRequestToEnclave
+        })?;
+
+    let response = stream.recv().await.map_err(|e| {
+        tracing::error!("Failed to receive response from enclave: {}", e);
+
+        ServerError::FailedToReceiveResponseFromEnclave
+    })?;
+
+    match response {
+        EnclaveResponse::PublicKey(public_key) => {
+            let Some(address) = sp1_tee_host::ethereum_address_from_encoded_point(&public_key)
+            else {
+                tracing::error!("Failed to convert public key to address");
+
+                return Err(ServerError::FailedToConvertPublicKeyToAddress);
+            };
+
+            Ok(Json(GetAddressResponse { address }))
+        }
+        _ => {
+            tracing::error!("Unexpected response from enclave: {:?}", response);
+
+            Err(ServerError::UnexpectedResponseFromEnclave)
         }
     }
 }

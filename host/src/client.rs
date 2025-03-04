@@ -1,4 +1,4 @@
-use reqwest::{Client as HttpClient, Error as HttpError, Url};
+use reqwest::{Client as HttpClient, Error as HttpError};
 use eventsource_stream::{Eventsource, EventStreamError};
 use futures::stream::StreamExt;
 

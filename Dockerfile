@@ -12,12 +12,6 @@ RUN yum update -y \
 # Install Rust via rustup
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
-# TEMPORARY: Use ssh key for private repos.
-RUN git config --global url."ssh://git@github.com".insteadOf "https://github.com"
-RUN mkdir -p ~/.ssh
-RUN touch ~/.ssh/known_hosts
-RUN ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
-
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 WORKDIR app
@@ -27,7 +21,7 @@ COPY install-guest.sh ./
 # Make sure your install-guest script is executable and run it
 RUN sed -i 's/sudo //g' ./install-guest.sh
 RUN chmod +x ./install-guest.sh
-RUN --mount=type=ssh ./install-guest.sh
+RUN ./install-guest.sh
 
 # Copy the entire Rust workspace into /app
 COPY . ./
@@ -36,9 +30,9 @@ COPY . ./
 RUN cmake --version
 
 RUN if [ "${DEBUG_MODE}" -eq "1" ]; then \
-        --mount=type=ssh cargo build --release --bin sp1-tee-enclave --features debug-mode; \
+        cargo build --release --bin sp1-tee-enclave --features debug-mode; \
     else \
-        --mount=type=ssh cargo build --release --bin sp1-tee-enclave; \
+        cargo build --release --bin sp1-tee-enclave; \
     fi
 
 # ---- Runtime Stage ----

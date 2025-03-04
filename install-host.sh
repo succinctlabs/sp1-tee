@@ -32,12 +32,17 @@ sudo cp allocator.template.yaml /etc/nitro_enclaves/allocator.yaml
 sudo systemctl restart nitro-enclaves-allocator.service
 
 # Install the tee server binary.
-cargo install --path host --bin sp1-tee-server
+cargo install --path host --bin sp1-tee-server --features production
 
 # Copy the tee-service template to the systemd directory.
 sudo cp tee-service.template.service /etc/systemd/system/tee-service.service
 
-# Enable and start the tee-service.
-sudo systemctl enable --now tee-service.service
+# Enable and start the tee-service if the --production flag is passed.
+if [ "$1" -eq "--production" ]; then
+    sudo systemctl enable --now tee-service.service
+else 
+    echo "In order to start the tee-service automatically, you must pass the --production flag."
+    echo "To start the debug mode server: `cargo run --bin sp1-tee-server -- --debug`"
+fi
 
 echo "Done installing Nitro Enclaves CLI, exit the session and login again for changes to take effect."

@@ -7,6 +7,10 @@ import {SP1VerifierGateway} from "sp1-contracts/src/SP1VerifierGateway.sol";
 import {ISP1VerifierWithHash} from "sp1-contracts/src/ISP1Verifier.sol";
 import {SP1Verifier as SP1VerifierPlonk} from "sp1-contracts/src/v4.0.0-rc.3/SP1VerifierPlonk.sol";
 
+interface Ownable {
+    function owner() external view returns (address);
+}
+
 contract SP1TeeVerifierTest is Test {
     SP1TeeVerifier sp1TeeVerifier;
     SP1VerifierGateway sp1VerifierGateway;
@@ -64,7 +68,7 @@ contract SP1TeeVerifierTest is Test {
         vm.assume(notTheOwner != address(this));
 
         vm.startPrank(notTheOwner);
-        vm.expectRevert("Only the owner can call this function");
+        vm.expectRevert("Only the gateway owner can call this function");
         sp1TeeVerifier.addSigner(notTheOwner);
     }
 
@@ -72,24 +76,8 @@ contract SP1TeeVerifierTest is Test {
         vm.assume(notTheOwner != address(this));
 
         vm.startPrank(notTheOwner);
-        vm.expectRevert("Only the owner can call this function");
+        vm.expectRevert("Only the gateway owner can call this function");
         sp1TeeVerifier.removeSigner(notTheOwner);
-    }
-
-    function testOnlyOwnerCanRenounceOwnership(address notTheOwner) public {
-        vm.assume(notTheOwner != address(this));
-
-        vm.startPrank(notTheOwner);
-        vm.expectRevert("Only the owner can call this function");
-        sp1TeeVerifier.renounceOwnership();
-    }
-
-    function testOnlyOwnerCanTransferOwnership(address notTheOwner) public {
-        vm.assume(notTheOwner != address(this));
-
-        vm.startPrank(notTheOwner);
-        vm.expectRevert("Only the owner can call this function");
-        sp1TeeVerifier.transferOwnership(notTheOwner);
     }
 
     /// @dev Returns a signed proof of the form:

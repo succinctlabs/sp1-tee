@@ -5,11 +5,15 @@ import {ISP1Verifier, ISP1VerifierWithHash} from "sp1-contracts/src/ISP1Verifier
 import {SimpleOwnable} from "./SimpleOwnable.sol";
 import {IterableMap, SignersMap} from "./SignersMap.sol";
 
+interface Ownable {
+    function owner() external view returns (address);
+}
+
 /// @title SP1 Tee Verifier
 /// @author Succinct Labs
 /// @notice This contract is a wrapper around any SP1 verifier that additionally verifies
 ///         a signature over the public values and program vkey.
-contract SP1TeeVerifier is ISP1VerifierWithHash, SimpleOwnable {
+contract SP1TeeVerifier is ISP1VerifierWithHash {
     using IterableMap for SignersMap;
 
     /// @notice Thrown when the proof bytes appear to be invalid.
@@ -26,6 +30,17 @@ contract SP1TeeVerifier is ISP1VerifierWithHash, SimpleOwnable {
 
     /// @notice The SP1 verifier gateway contract.
     ISP1Verifier public immutable gateway;
+
+    /// @notice Modifier to ensure the caller is the gateway owner.
+    /// 
+    /// @dev Better to reuse the owner to simplify upgrade scope.
+    modifier onlyOwner() {
+        if (msg.sender != Ownable(address(gateway)).owner()) {
+            revert("Only the gateway owner can call this function");
+        }
+
+        _;
+    }
 
     constructor(address _gateway) {
         gateway = ISP1Verifier(_gateway);

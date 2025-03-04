@@ -33,9 +33,9 @@ fi
 
 # Always build the enclave from scratch.
 if [[ $2 == "-f" || $2 == "--debug" ]]; then
-    docker build --ssh default --build-arg DEBUG_MODE=1 -t sp1-tee .
+    docker build --build-arg DEBUG_MODE=1 -t sp1-tee .
 else
-    docker build --ssh default -t sp1-tee .
+    docker build -t sp1-tee .
 fi
 
 # Create the EIF from the enclave.

@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.4
-
 # ---- Build Stage ----
 FROM public.ecr.aws/amazonlinux/amazonlinux:2023 AS builder
 

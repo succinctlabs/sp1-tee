@@ -6111,7 +6111,6 @@ dependencies = [
 [[package]]
 name = "sp1-build"
 version = "4.1.2"
-source = "git+https://github.com/succinctlabs/sp1-wip?branch=n/tee-proofs#220268e0fac20a12e6a56232b21e485aeb57e620"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -6123,7 +6122,6 @@ dependencies = [
 [[package]]
 name = "sp1-core-executor"
 version = "4.1.2"
-source = "git+https://github.com/succinctlabs/sp1-wip?branch=n/tee-proofs#220268e0fac20a12e6a56232b21e485aeb57e620"
 dependencies = [
  "bincode",
  "bytemuck",
@@ -6162,7 +6160,6 @@ dependencies = [
 [[package]]
 name = "sp1-core-machine"
 version = "4.1.2"
-source = "git+https://github.com/succinctlabs/sp1-wip?branch=n/tee-proofs#220268e0fac20a12e6a56232b21e485aeb57e620"
 dependencies = [
  "bincode",
  "cbindgen",
@@ -6218,7 +6215,6 @@ dependencies = [
 [[package]]
 name = "sp1-cuda"
 version = "4.1.2"
-source = "git+https://github.com/succinctlabs/sp1-wip?branch=n/tee-proofs#220268e0fac20a12e6a56232b21e485aeb57e620"
 dependencies = [
  "bincode",
  "ctrlc",
@@ -6234,7 +6230,6 @@ dependencies = [
 [[package]]
 name = "sp1-curves"
 version = "4.1.2"
-source = "git+https://github.com/succinctlabs/sp1-wip?branch=n/tee-proofs#220268e0fac20a12e6a56232b21e485aeb57e620"
 dependencies = [
  "cfg-if",
  "dashu",
@@ -6255,7 +6250,6 @@ dependencies = [
 [[package]]
 name = "sp1-derive"
 version = "4.1.2"
-source = "git+https://github.com/succinctlabs/sp1-wip?branch=n/tee-proofs#220268e0fac20a12e6a56232b21e485aeb57e620"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -6264,7 +6258,6 @@ dependencies = [
 [[package]]
 name = "sp1-primitives"
 version = "4.1.2"
-source = "git+https://github.com/succinctlabs/sp1-wip?branch=n/tee-proofs#220268e0fac20a12e6a56232b21e485aeb57e620"
 dependencies = [
  "bincode",
  "hex",
@@ -6281,7 +6274,6 @@ dependencies = [
 [[package]]
 name = "sp1-prover"
 version = "4.1.2"
-source = "git+https://github.com/succinctlabs/sp1-wip?branch=n/tee-proofs#220268e0fac20a12e6a56232b21e485aeb57e620"
 dependencies = [
  "anyhow",
  "bincode",
@@ -6325,7 +6317,6 @@ dependencies = [
 [[package]]
 name = "sp1-recursion-circuit"
 version = "4.1.2"
-source = "git+https://github.com/succinctlabs/sp1-wip?branch=n/tee-proofs#220268e0fac20a12e6a56232b21e485aeb57e620"
 dependencies = [
  "hashbrown 0.14.5",
  "itertools 0.13.0",
@@ -6359,7 +6350,6 @@ dependencies = [
 [[package]]
 name = "sp1-recursion-compiler"
 version = "4.1.2"
-source = "git+https://github.com/succinctlabs/sp1-wip?branch=n/tee-proofs#220268e0fac20a12e6a56232b21e485aeb57e620"
 dependencies = [
  "backtrace",
  "itertools 0.13.0",
@@ -6380,7 +6370,6 @@ dependencies = [
 [[package]]
 name = "sp1-recursion-core"
 version = "4.1.2"
-source = "git+https://github.com/succinctlabs/sp1-wip?branch=n/tee-proofs#220268e0fac20a12e6a56232b21e485aeb57e620"
 dependencies = [
  "backtrace",
  "cbindgen",
@@ -6422,7 +6411,6 @@ dependencies = [
 [[package]]
 name = "sp1-recursion-derive"
 version = "4.1.2"
-source = "git+https://github.com/succinctlabs/sp1-wip?branch=n/tee-proofs#220268e0fac20a12e6a56232b21e485aeb57e620"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -6431,7 +6419,6 @@ dependencies = [
 [[package]]
 name = "sp1-recursion-gnark-ffi"
 version = "4.1.2"
-source = "git+https://github.com/succinctlabs/sp1-wip?branch=n/tee-proofs#220268e0fac20a12e6a56232b21e485aeb57e620"
 dependencies = [
  "anyhow",
  "bincode",
@@ -6456,7 +6443,6 @@ dependencies = [
 [[package]]
 name = "sp1-sdk"
 version = "4.1.2"
-source = "git+https://github.com/succinctlabs/sp1-wip?branch=n/tee-proofs#220268e0fac20a12e6a56232b21e485aeb57e620"
 dependencies = [
  "alloy-primitives",
  "alloy-signer",
@@ -6504,7 +6490,6 @@ dependencies = [
 [[package]]
 name = "sp1-stark"
 version = "4.1.2"
-source = "git+https://github.com/succinctlabs/sp1-wip?branch=n/tee-proofs#220268e0fac20a12e6a56232b21e485aeb57e620"
 dependencies = [
  "arrayref",
  "hashbrown 0.14.5",

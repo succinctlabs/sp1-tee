@@ -40,7 +40,7 @@ pub fn ethereum_address_from_encoded_point(encoded_point: &k256::EncodedPoint) -
         return None;
     }
 
-    Some(ethereum_address_from_sec1_bytes(encoded_point.as_bytes()))
+    ethereum_address_from_sec1_bytes(encoded_point.as_bytes())
 }
 
 /// Converts a K256 SEC1 encoded public key to an Ethereum address.
@@ -52,7 +52,17 @@ pub fn ethereum_address_from_encoded_point(encoded_point: &k256::EncodedPoint) -
 /// ```
 /// 
 /// Ethereum address are derived as `keccack256([x || y])[12..]`
+/// 
+/// Returns `None` if the format is invalid.
 #[cfg(feature = "attestations")]
-pub fn ethereum_address_from_sec1_bytes(public_key: &[u8]) -> Address {
-    Address::from_raw_public_key(&public_key[1..])
+pub fn ethereum_address_from_sec1_bytes(public_key: &[u8]) -> Option<Address> {
+    if public_key.len() != 65 {
+        return None;
+    }
+
+    if public_key[0] != 0x04 {
+        return None;
+    }
+
+    Some(Address::from_raw_public_key(&public_key[1..]))
 }

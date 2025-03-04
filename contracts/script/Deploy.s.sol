@@ -6,11 +6,9 @@ import {SP1TeeVerifier} from "../src/SP1TeeVerifier.sol";
 
 contract CounterScript is Script {
     function run() public {
-        address sp1VerifierGateway = vm.envAddress("SP1_VERIFIER_GATEWAY");
-
         vm.startBroadcast();
 
-        SP1TeeVerifier sp1TeeVerifier = new SP1TeeVerifier(sp1VerifierGateway);
+        SP1TeeVerifier sp1TeeVerifier = new SP1TeeVerifier(msg.sender);
 
         vm.stopBroadcast();
 

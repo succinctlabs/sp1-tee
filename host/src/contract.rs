@@ -9,6 +9,9 @@ mod bindings {
 
             /// @notice Returns the list of signers.
             function getSigners() external view returns (address[] memory);
+
+            /// @notice Returns true if the address is a signer.
+            function isSigner(address signer) external view returns (bool);
         }
     }
     

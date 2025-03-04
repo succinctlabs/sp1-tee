@@ -42,7 +42,7 @@ if [ "$1" = "--production" ]; then
     sudo systemctl enable --now tee-service.service
 else 
     echo "In order to start the tee-service automatically, you must pass the --production flag."
-    echo "To start the debug mode server: `cargo run --bin sp1-tee-server -- --debug`"
+    echo "To start the debug mode server: cargo run --bin sp1-tee-server -- --debug"
 fi
 
 echo "Done installing Nitro Enclaves CLI, exit the session and login again for changes to take effect."

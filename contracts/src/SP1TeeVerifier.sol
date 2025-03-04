@@ -63,7 +63,7 @@ contract SP1TeeVerifier is ISP1VerifierWithHash, SimpleOwnable {
     ///
     /// @dev Since this is not a "real verifier" this is merely a constant used for identification.
     function VERIFIER_HASH() public pure returns (bytes32) {
-        return keccak256(abi.encodePacked("SP1TeeVerifier", abi.encode(VERSION)));
+        return keccak256(abi.encodePacked("SP1TeeVerifier"));
     }
 
     /// @notice Verifies a proof with given public values and vkey.

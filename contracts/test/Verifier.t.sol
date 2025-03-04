@@ -26,7 +26,7 @@ contract SP1TeeVerifierTest is Test {
 
     function setUp() public {
         sp1VerifierGateway = new SP1VerifierGateway(address(this));
-        sp1TeeVerifier = new SP1TeeVerifier(address(sp1VerifierGateway));
+        sp1TeeVerifier = new SP1TeeVerifier(address(this));
         sp1VerifierPlonk = new SP1VerifierPlonk();
 
         // Add message signer as a signer.
@@ -68,7 +68,7 @@ contract SP1TeeVerifierTest is Test {
         vm.assume(notTheOwner != address(this));
 
         vm.startPrank(notTheOwner);
-        vm.expectRevert("Only the gateway owner can call this function");
+        vm.expectRevert("Only the owner can call this function");
         sp1TeeVerifier.addSigner(notTheOwner);
     }
 
@@ -76,7 +76,7 @@ contract SP1TeeVerifierTest is Test {
         vm.assume(notTheOwner != address(this));
 
         vm.startPrank(notTheOwner);
-        vm.expectRevert("Only the gateway owner can call this function");
+        vm.expectRevert("Only the owner can call this function");
         sp1TeeVerifier.removeSigner(notTheOwner);
     }
 

@@ -83,6 +83,8 @@ async fn main() {
 async fn get_address(
     State(server): State<Arc<Server>>,
 ) -> Result<Json<GetAddressResponse>, ServerError> {
+    tracing::debug!("Handling get address request");
+
     let mut stream = HostStream::new(server.cid, sp1_tee_common::ENCLAVE_PORT)
         .await
         .map_err(|e| {

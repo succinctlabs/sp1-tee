@@ -46,7 +46,7 @@ impl Server {
 #[derive(Parser)]
 pub struct ServerArgs {
     /// The port to listen on.
-    #[clap(short, long, default_value = "80")]
+    #[clap(short, long, default_value = "8080")]
     pub port: u16,
 
     /// The address to listen on.

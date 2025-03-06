@@ -1,17 +1,28 @@
+use alloy::primitives::Address;
+use alloy::providers::Provider;
 use sp1_tee_host::api::TEERequest;
 use sp1_tee_host::Client;
 use sp1_sdk::SP1Stdin;
+use sp1_sdk::network::tee::TEEProof;
 use clap::Parser;
 
 #[derive(Debug, Parser)]
 struct Args {
     /// The address to connect to.
-    #[clap(short, long, default_value = "http://localhost:3000")]
+    #[clap(short, long, default_value = "https://tee.production.succinct.xyz")]
     address: String,
 
     /// The number of fibonacci numbers to compute.
     #[clap(short, long, default_value = "10")]
     count: u32,
+
+    /// The private key to use for the prover.
+    #[clap(short, long)]
+    pk: String,
+
+    /// The contract address to submit the proof to.
+    #[clap(short, long)]
+    contract: Address,
 }
 
 #[tokio::main]
@@ -22,15 +33,12 @@ async fn main() {
     let mut stdin = SP1Stdin::new();
     stdin.write(&args.count);
 
-    let request = TEERequest {
-        id: [1; 32],
-        program: program.to_vec(),
-        stdin: stdin,
-    };
+    let prover = sp1_sdk::ProverClient::builder().network().private_key(&args.pk).build();
+    let (pk, vk) = prover.setup(program);
+    let proof = prover.prove(&pk, &stdin)
+        .with_tee_integrity_proof(TEEProof::NitroIntegrity)
+        .run()
+        .unwrap();
 
-    let client = Client::new(&args.address);
-
-    let response = client.execute(request).await;
-
-    println!("Response: {:#?}", response);
+    println!("Proof bytes: {:?}", proof.bytes());
 }

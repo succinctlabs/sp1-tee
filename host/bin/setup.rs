@@ -34,12 +34,6 @@ struct Args {
     #[clap(long)]
     rpc_url: String,
 
-    /// The SP1 verifier gateway address.
-    ///
-    /// This will otherwise be loaded from the env.
-    #[clap(long)]
-    gateway: Option<String>,
-
     /// The private key to use.
     ///
     /// This will otherwise be loaded from the env.
@@ -48,13 +42,13 @@ struct Args {
 
     /// The etherscan API key to use.
     ///
-    /// This will otherwise be loaded from the env.
+    /// This will otherwise be loaded from the env, ignored if deploying to anvil.
     #[clap(long)]
     etherscan_api_key: Option<String>,
 
     /// The etherscan URL to use.
     ///
-    /// This will otherwise be loaded from the env.
+    /// This will otherwise be loaded from the env, ignored if deploying to anvil.
     #[clap(long)]
     etherscan_url: Option<String>,
 
@@ -109,13 +103,8 @@ async fn main() {
     if args.deploy {
         println!("Deploying contracts..");
 
-        let gateway = unwrap_or_env(&args.gateway, "SP1_VERIFIER_GATEWAY")
-            .parse::<Address>()
-            .expect("Failed to parse SP1_VERIFIER_GATEWAY");
-
         let mut command = Command::new("forge");
         command.current_dir("contracts");
-        command.env("SP1_VERIFIER_GATEWAY", gateway.to_string());
 
         // If the RPC url is anvil, we need to use the anvil deploy args
         if args.rpc_url.starts_with("http") {

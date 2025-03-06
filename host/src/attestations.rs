@@ -15,8 +15,8 @@ use aws_nitro_enclaves_nsm_api::api::AttestationDoc;
 use crate::ethereum_address_from_encoded_point;
 use crate::HostStream;
 
-// Resubmit the attestation every 12 hours
-pub const ATTESTATION_INTERVAL: Duration = Duration::from_secs(12 * 60 * 60);
+// Attestations expire every 3 hours, so update every 2 hours.
+pub const ATTESTATION_INTERVAL: Duration = Duration::from_secs(2 * 60 * 60);
 
 /// Creates an S3 client from the environment variables.
 /// 
@@ -125,7 +125,7 @@ pub async fn save_attestation(args: SaveAttestationArgs) -> Result<(), SaveAttes
         .body(attestation.into())
         .send()
         .await?;
-
+ 
     Ok(())
 }
 

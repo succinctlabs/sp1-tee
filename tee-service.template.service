@@ -10,6 +10,7 @@ ExecStart=/home/ec2-user/.cargo/bin/sp1-tee-server
 Restart=always
 RestartSec=5s
 KillSignal=SIGINT
+EnvironmentFile=/home/ec2-user/.env 
 
 [Install]
 WantedBy=multi-user.target

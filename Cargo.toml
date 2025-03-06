@@ -24,6 +24,9 @@ k256 = { version = "0.13.4", features = ["serde"] }
 aws-nitro-enclaves-nsm-api = "0.4.0"
 tracing = "0.1.41"
 
+# Alerts
+alert-subscriber = { git = "https://github.com/succinctlabs/alert-subscriber.git", branch = "main" }
+
 # TEMP: Use local sp1-wip repo for now.
 # TODO: Change this to public when merged.
 sp1-sdk = { path = "sp1-wip/crates/sdk" }

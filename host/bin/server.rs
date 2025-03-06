@@ -19,6 +19,8 @@ use std::{convert::Infallible, str::FromStr};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
+
 use futures::stream::{self, Stream, StreamExt};
 
 /// Initialize the tracing subscriber.
@@ -30,10 +32,16 @@ fn init_tracing() {
             .expect("Failed to server default env filter"),
     );
 
-    tracing_subscriber::fmt()
-        .with_env_filter(default_env_filter)
+    let fmt_layer = tracing_subscriber::fmt::layer()
         .with_line_number(true)
         .with_file(true)
+        .with_filter(default_env_filter);
+
+    let alert_layer = alert_subscriber::seal_layer();
+
+    tracing_subscriber::Registry::default()
+        .with(fmt_layer)
+        .with(alert_layer)
         .init();
 }
 
@@ -44,7 +52,7 @@ async fn main() {
     let args = ServerArgs::parse();
 
     // First, kill any existing enclaves.
-    // 
+    //
     // Just in case the server was killed uncleanly last time.
     sp1_tee_host::server::terminate_enclaves();
 
@@ -88,7 +96,10 @@ async fn get_address(
     let mut stream = HostStream::new(server.cid, sp1_tee_common::ENCLAVE_PORT)
         .await
         .map_err(|e| {
-            tracing::error!("Failed to connect to enclave: {}", e);
+            tracing::error!(
+                alert = true,
+                "Failed to connect to enclave: {}", e
+            );
 
             ServerError::FailedToConnectToEnclave
         })?;
@@ -97,13 +108,19 @@ async fn get_address(
         .send(EnclaveRequest::GetPublicKey)
         .await
         .map_err(|e| {
-            tracing::error!("Failed to send request to enclave: {}", e);
+            tracing::error!(
+                alert = true,
+                "Failed to send request to enclave: {}", e
+            );
 
             ServerError::FailedToSendRequestToEnclave
         })?;
 
     let response = stream.recv().await.map_err(|e| {
-        tracing::error!("Failed to receive response from enclave: {}", e);
+        tracing::error!(
+            alert = true,
+            "Failed to receive response from enclave: {}", e
+        );
 
         ServerError::FailedToReceiveResponseFromEnclave
     })?;
@@ -112,7 +129,10 @@ async fn get_address(
         EnclaveResponse::PublicKey(public_key) => {
             let Some(address) = sp1_tee_host::ethereum_address_from_encoded_point(&public_key)
             else {
-                tracing::error!("Failed to convert public key to address");
+                tracing::error!(
+                    alert = true,
+                    "Failed to convert public key to address"
+                );
 
                 return Err(ServerError::FailedToConvertPublicKeyToAddress);
             };
@@ -120,7 +140,10 @@ async fn get_address(
             Ok(Json(GetAddressResponse { address }))
         }
         _ => {
-            tracing::error!("Unexpected response from enclave: {:?}", response);
+            tracing::error!(
+                alert = true,
+                "Unexpected response from enclave: {:?}", response
+            );
 
             Err(ServerError::UnexpectedResponseFromEnclave)
         }
@@ -154,7 +177,11 @@ async fn execute_inner(
     let mut stream = HostStream::new(server.cid, sp1_tee_common::ENCLAVE_PORT)
         .await
         .map_err(|e| {
-            tracing::error!("Failed to connect to enclave: {}", e);
+            tracing::error!(
+                alert = true,
+                "Failed to connect to enclave: {}", e
+            );
+
             ServerError::FailedToConnectToEnclave
         })?;
 
@@ -168,7 +195,11 @@ async fn execute_inner(
 
     // Send the request to the enclave.
     stream.send(request).await.map_err(|e| {
-        tracing::error!("Failed to send request to enclave: {}", e);
+        tracing::error!(
+            alert = true,
+            "Failed to send request to enclave: {}", e
+        );
+
         ServerError::FailedToSendRequestToEnclave
     })?;
 
@@ -176,7 +207,10 @@ async fn execute_inner(
 
     // Receive the response from the enclave.
     let response = stream.recv().await.map_err(|e| {
-        tracing::error!("Failed to receive response from enclave: {:?}", e);
+        tracing::error!(
+            alert = true,
+            "Failed to receive response from enclave: {:?}", e
+        );
 
         ServerError::FailedToReceiveResponseFromEnclave
     })?;
@@ -199,12 +233,18 @@ async fn execute_inner(
             })
         }
         EnclaveResponse::Error(error) => {
-            tracing::error!("Error from enclave: {:?}", error);
+            // This error type is expected, it can happen if the execution fails.
+            tracing::error!(
+                "Error during execution from enclave: {:?}", error
+            );
 
             Err(ServerError::EnclaveError(error))
         }
         _ => {
-            tracing::error!("Unexpected response from enclave: {:?}", response);
+            tracing::error!(
+                alert = true,
+                "Unexpected response from enclave: {:?}", response
+            );
 
             Err(ServerError::UnexpectedResponseFromEnclave)
         }

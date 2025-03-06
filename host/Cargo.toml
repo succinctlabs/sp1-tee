@@ -46,6 +46,7 @@ k256 = { workspace = true }
 alloy = { version = "0.11.1", features = ["full"] }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+alert-subscriber = { workspace = true }
 hex = "0.4.3"
 axum = { version = "0.8.1", optional = true }
 

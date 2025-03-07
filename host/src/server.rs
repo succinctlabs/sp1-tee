@@ -185,6 +185,8 @@ pub fn spawn_attestation_task(cid: u32, port: u16, interval: Duration) {
         // Sleep for a bit before starting the loop, this allows the enclave to start.
         tokio::time::sleep(TRY_AGAIN_INTERVAL).await;
 
+        let mut interval = tokio::time::interval(interval);
+
         loop {
             if let Err(e) =
                 crate::attestations::save_attestation(crate::attestations::SaveAttestationArgs {
@@ -200,7 +202,7 @@ pub fn spawn_attestation_task(cid: u32, port: u16, interval: Duration) {
                 continue;
             }
 
-            tokio::time::sleep(interval).await;
+            interval.tick().await;
         }
     });
 }

@@ -153,7 +153,7 @@ async fn get_address(
 /// Execute a program on the enclave.
 ///
 /// In order to avoid OOM in the enclave, we run only one program at a time.
-#[tracing::instrument(skip_all, fields(id = ?request.id))]
+#[tracing::instrument(skip_all, fields(id = hex::encode(request.id)))]
 async fn execute(
     State(server): State<Arc<Server>>,
     Json(request): Json<TEERequest>,

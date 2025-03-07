@@ -19,6 +19,7 @@ contract DeployScript is Script {
             SP1Verifier verifier = new SP1Verifier();
 
             verifierGateway.addRoute(address(verifier));
+            verifierGateway.addRoute(address(sp1TeeVerifier));
 
             console.log("Deployed verifier gateway at %s", address(verifierGateway));
         }

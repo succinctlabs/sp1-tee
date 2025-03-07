@@ -1,13 +1,15 @@
+use alloy::network::EthereumWallet;
 use alloy::primitives::Address;
 use alloy::providers::Provider;
-use sp1_sdk::HashableKey;
-use sp1_tee_host::api::TEERequest;
-use sp1_tee_host::Client;
-use sp1_sdk::SP1Stdin;
-use sp1_sdk::Prover;
-use sp1_sdk::network::tee::TEEProof;
+use alloy::providers::ProviderBuilder;
+use alloy::signers::local::PrivateKeySigner;
 use clap::Parser;
-use tracing_subscriber::layer::SubscriberExt;
+use sp1_sdk::network::tee::TEEProof;
+use sp1_sdk::HashableKey;
+use sp1_sdk::Prover;
+use sp1_sdk::SP1Stdin;
+
+use sp1_tee_host::contract::TEEVerifier;
 
 #[derive(Debug, Parser)]
 struct Args {
@@ -19,14 +21,14 @@ struct Args {
     #[clap(short, long, default_value = "10")]
     count: u32,
 
-    /// The private key to use for the prover.
+    /// The verifier gateway address on Anvil.
     #[clap(short, long)]
-    pk: String,
+    verifier: Option<Address>,
 }
 
 #[tokio::main]
-async fn main() { 
-    tracing_subscriber::fmt::init();
+async fn main() {
+    sp1_tee_host::init_tracing();
 
     let args = Args::parse();
     let program = include_bytes!("../../fixtures/fibonacci.elf");
@@ -34,15 +36,67 @@ async fn main() {
     let mut stdin = SP1Stdin::new();
     stdin.write(&args.count);
 
-    let prover = sp1_sdk::ProverClient::builder().network().private_key(&args.pk).build();
+    let network_pk = std::env::var("NETWORK_PK").unwrap();
+    let prover = sp1_sdk::ProverClient::builder()
+        .network()
+        .private_key(&network_pk)
+        .build();
+
     let (pk, vk) = prover.setup(program);
-    let proof = prover.prove(&pk, &stdin)
+    let proof = prover
+        .prove(&pk, &stdin)
         .plonk()
-        .with_tee_integrity_proof(TEEProof::NitroIntegrity)
+        .tee_proof(TEEProof::NitroIntegrity)
         .run()
         .unwrap();
 
-    println!("Proof bytes: {:?}", hex::encode(proof.bytes()));
-    println!("VK: {:?}", vk.bytes32());
-    println!("public values: {:?}", hex::encode(proof.public_values.as_slice()));
+    if let Some(verifier) = args.verifier {
+        let provider = anvil_provider();
+
+        let _ = provider.get_chain_id().await.expect("Failed to fetch chain id on default anvil ports, make sure anvil is running");
+
+        let verifier = TEEVerifier::new(verifier, provider);
+
+        let hash = verifier
+            .verifyProof(
+                vk.bytes32_raw().into(),
+                proof.public_values.to_vec().into(),
+                proof.bytes().into(),
+            )
+            .send()
+            .await
+            .unwrap()
+            .watch()
+            .await
+            .unwrap();
+
+        println!("Proof verified, tx hash: {:?}", hash);
+    } else {
+        println!("Proof bytes: {:?}", hex::encode(proof.bytes()));
+        println!("VK: {:?}", vk.bytes32());
+        println!(
+            "public values: {:?}",
+            hex::encode(proof.public_values.as_slice())
+        );
+    }
 }
+
+fn anvil_provider() -> impl Provider {
+    let anvil_pk = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+            .parse::<PrivateKeySigner>()
+            .unwrap();
+
+    let wallet = EthereumWallet::new(anvil_pk);
+    let provider = ProviderBuilder::new()
+        .wallet(wallet)
+        .on_http("http://127.0.0.1:8545".parse().unwrap());
+
+    provider
+}
+
+//
+// Anvil Commands                                                                               anvil pk
+// cargo run --bin sp1-tee-setup -- --deploy --rpc-url=http://127.0.0.1:8545 --private-key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+//
+// cargo run --example fibonacci --features client -- --verifier 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
+//

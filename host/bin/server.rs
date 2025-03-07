@@ -15,39 +15,14 @@ use sp1_tee_host::{
     HostStream,
 };
 use std::sync::Arc;
-use std::{convert::Infallible, str::FromStr};
+use std::convert::Infallible;
 use tokio::net::TcpListener;
-use tracing_subscriber::EnvFilter;
-
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
 use futures::stream::{self, Stream, StreamExt};
 
-/// Initialize the tracing subscriber.
-///
-/// The default filter is `sp1-tee-server=debug,info`.
-fn init_tracing() {
-    let default_env_filter = EnvFilter::try_from_default_env().unwrap_or(
-        EnvFilter::from_str("sp1_tee_server=debug,sp1_tee_host=debug,info")
-            .expect("Failed to server default env filter"),
-    );
-
-    let fmt_layer = tracing_subscriber::fmt::layer()
-        .with_line_number(true)
-        .with_file(true)
-        .with_filter(default_env_filter);
-
-    let alert_layer = alert_subscriber::seal_layer();
-
-    tracing_subscriber::Registry::default()
-        .with(fmt_layer)
-        .with(alert_layer)
-        .init();
-}
-
 #[tokio::main]
 async fn main() {
-    init_tracing();
+    sp1_tee_host::init_tracing();
 
     let args = ServerArgs::parse();
 

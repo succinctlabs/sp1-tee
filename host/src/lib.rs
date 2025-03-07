@@ -1,6 +1,9 @@
 #[cfg(feature = "attestations")]
 use alloy::primitives::Address;
 
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
+
 /// The functionality for saving and verifying attestations.
 #[cfg(feature = "attestations")]
 pub mod attestations;
@@ -30,6 +33,32 @@ pub use sp1_sdk::network::tee::client::{Client, ClientError};
 pub const S3_BUCKET: &str = "sp1-tee-attestations";
 #[cfg(not(feature = "production"))]
 pub const S3_BUCKET: &str = "sp1-tee-attestations-testing";
+
+/// Initialize the tracing subscriber.
+///
+/// The default filter is `sp1-tee-server=debug,info`.
+pub fn init_tracing() {
+    let default_env_filter = EnvFilter::try_from_default_env().unwrap_or(
+        EnvFilter::try_from("sp1_tee_server=debug,sp1_tee_host=debug,info")
+            .expect("Failed to server default env filter"),
+    );
+
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        .with_line_number(true)
+        .with_file(true)
+        .with_filter(default_env_filter);
+
+    let alert_layer = if std::env::var("DISABLE_ALERTS").is_ok() {
+        None
+    } else {
+        Some(alert_subscriber::seal_layer())
+    };
+
+    tracing_subscriber::Registry::default()
+        .with(fmt_layer)
+        .with(alert_layer)
+        .init();
+}
 
 /// Converts a K256 encoded point to an Ethereum address.
 /// 

@@ -12,6 +12,8 @@ mod bindings {
 
             /// @notice Returns true if the address is a signer.
             function isSigner(address signer) external view returns (bool);
+
+            function verifyProof(bytes32 vk, bytes public_input, bytes memory proof) external view returns (bool);
         }
     }
     

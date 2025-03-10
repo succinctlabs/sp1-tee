@@ -132,7 +132,25 @@ async fn get_address(
 async fn execute(
     State(server): State<Arc<Server>>,
     Json(request): Json<TEERequest>,
-) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, ServerError> {
+    #[cfg(feature = "production")]
+    {
+        let signer = request.signature.recover_address_from_msg(request.id).expect("Failed to recover signer address");
+
+        match server.auth_client.is_whitelisted(signer).await {
+            Ok(true) => (),
+            Ok(false) => return Err(ServerError::FailedToAuthenticateRequest),
+            Err(e) => {
+                tracing::error!(
+                    alert = true,
+                    "Failed to authenticate request {}: {}", hex::encode(request.id), e
+                );
+
+                return Err(ServerError::FailedToAuthenticateRequest);
+            }
+        }
+    }
+
     let _guard = server.execution_mutex.lock().await;
 
     tracing::info!("Executing request");
@@ -141,7 +159,7 @@ async fn execute(
     let response =
         stream::once(response).map(|response| Ok(sp1_tee_host::api::result_to_event(response)));
 
-    Sse::new(response)
+    Ok(Sse::new(response))
 }
 
 async fn execute_inner(

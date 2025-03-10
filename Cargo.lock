@@ -6071,7 +6071,7 @@ dependencies = [
 
 [[package]]
 name = "sp1-build"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -6082,7 +6082,7 @@ dependencies = [
 
 [[package]]
 name = "sp1-core-executor"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "bincode",
  "bytemuck",
@@ -6093,7 +6093,6 @@ dependencies = [
  "hashbrown 0.14.5",
  "hex",
  "itertools 0.13.0",
- "log",
  "nohash-hasher",
  "num",
  "p3-baby-bear",
@@ -6120,7 +6119,7 @@ dependencies = [
 
 [[package]]
 name = "sp1-core-machine"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "bincode",
  "cbindgen",
@@ -6133,7 +6132,6 @@ dependencies = [
  "hex",
  "itertools 0.13.0",
  "k256",
- "log",
  "num",
  "num_cpus",
  "p256 0.13.2",
@@ -6175,7 +6173,7 @@ dependencies = [
 
 [[package]]
 name = "sp1-cuda"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "bincode",
  "ctrlc",
@@ -6190,7 +6188,7 @@ dependencies = [
 
 [[package]]
 name = "sp1-curves"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "cfg-if",
  "dashu",
@@ -6210,7 +6208,7 @@ dependencies = [
 
 [[package]]
 name = "sp1-derive"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -6218,7 +6216,7 @@ dependencies = [
 
 [[package]]
 name = "sp1-primitives"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "bincode",
  "hex",
@@ -6234,7 +6232,7 @@ dependencies = [
 
 [[package]]
 name = "sp1-prover"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "anyhow",
  "bincode",
@@ -6277,7 +6275,7 @@ dependencies = [
 
 [[package]]
 name = "sp1-recursion-circuit"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "hashbrown 0.14.5",
  "itertools 0.13.0",
@@ -6310,7 +6308,7 @@ dependencies = [
 
 [[package]]
 name = "sp1-recursion-compiler"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "backtrace",
  "itertools 0.13.0",
@@ -6330,7 +6328,7 @@ dependencies = [
 
 [[package]]
 name = "sp1-recursion-core"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "backtrace",
  "cbindgen",
@@ -6371,7 +6369,7 @@ dependencies = [
 
 [[package]]
 name = "sp1-recursion-derive"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -6379,7 +6377,7 @@ dependencies = [
 
 [[package]]
 name = "sp1-recursion-gnark-ffi"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "anyhow",
  "bincode",
@@ -6387,7 +6385,6 @@ dependencies = [
  "cc",
  "cfg-if",
  "hex",
- "log",
  "num-bigint 0.4.6",
  "p3-baby-bear",
  "p3-field",
@@ -6399,11 +6396,12 @@ dependencies = [
  "sp1-recursion-compiler",
  "sp1-stark",
  "tempfile",
+ "tracing",
 ]
 
 [[package]]
 name = "sp1-sdk"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "alloy-primitives",
  "alloy-signer",
@@ -6422,7 +6420,6 @@ dependencies = [
  "indicatif",
  "itertools 0.13.0",
  "k256",
- "log",
  "p3-baby-bear",
  "p3-field",
  "p3-fri",
@@ -6450,7 +6447,7 @@ dependencies = [
 
 [[package]]
 name = "sp1-stark"
-version = "4.1.2"
+version = "4.1.3"
 dependencies = [
  "arrayref",
  "hashbrown 0.14.5",
@@ -6537,6 +6534,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tokio-vsock",
+ "tonic",
  "tracing",
  "tracing-subscriber",
 ]

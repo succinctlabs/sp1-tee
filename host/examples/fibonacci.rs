@@ -9,7 +9,7 @@ use sp1_sdk::HashableKey;
 use sp1_sdk::Prover;
 use sp1_sdk::SP1Stdin;
 
-use sp1_tee_host::contract::TEEVerifier;
+use sp1_tee_host::contract::TEEVerifier as SP1Gateway;
 
 #[derive(Debug, Parser)]
 struct Args {
@@ -55,7 +55,7 @@ async fn main() {
 
         let _ = provider.get_chain_id().await.expect("Failed to fetch chain id on default anvil ports, make sure anvil is running");
 
-        let verifier = TEEVerifier::new(verifier, provider);
+        let verifier = SP1Gateway::new(verifier, provider);
 
         let hash = verifier
             .verifyProof(

@@ -59,6 +59,7 @@ futures = { version = "0.3.31", optional = true }
 
 # SDK Helpers
 sp1-sdk = { workspace = true }
+tonic = { version = "0.12", features = ["tls", "tls-roots"], optional = true }
 bincode.workspace = true
 serde_json = "1.0.140"
 
@@ -69,7 +70,7 @@ tokio = { workspace = true }
 default = ["server"]
 # Use production constants.
 production = []
-server = ["attestations", "dep:axum", "dep:tokio-vsock", "dep:tokio", "dep:futures"]
+server = ["attestations", "dep:axum", "dep:tokio-vsock", "dep:tokio", "dep:futures", "dep:tonic"]
 attestations = [
     "dep:aws-config",
     "dep:aws-sdk-s3",

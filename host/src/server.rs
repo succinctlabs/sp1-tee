@@ -1,8 +1,14 @@
+#[cfg(feature = "production")]
+use auth::AuthClient;
+
 use clap::Parser;
 use std::{path::Path, sync::Arc, time::Duration};
 use axum::{response::IntoResponse, http::StatusCode, response::Response};
 
 pub mod stream;
+
+#[cfg(feature = "production")]
+pub mod auth;
 
 /// The directory of the manifest file.
 ///
@@ -12,6 +18,8 @@ const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 pub struct Server {
     pub execution_mutex: tokio::sync::Mutex<()>,
     pub cid: u32,
+    #[cfg(feature = "production")]
+    pub auth_client: AuthClient,
 }
 
 impl Server {
@@ -39,6 +47,8 @@ impl Server {
         Arc::new(Self {
             execution_mutex: tokio::sync::Mutex::new(()),
             cid: args.enclave_cid,
+            #[cfg(feature = "production")]
+            auth_client: AuthClient::new(&args.prover_network_url),
         })
     }
 }
@@ -68,6 +78,10 @@ pub struct ServerArgs {
     /// Run the enclave in debug mode.
     #[clap(short, long)]
     pub debug: bool,
+
+    /// The RPC URL of the prover network.
+    #[clap(long, default_value = "https://rpc.production.succinct.xyz/")]
+    pub prover_network_url: String,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -95,6 +109,10 @@ pub enum ServerError {
 
     #[error("Program is too large, found {0} bytes")]
     ProgramTooLarge(usize),
+
+    #[cfg(feature = "production")]
+    #[error("Failed to authenticate request")]
+    FailedToAuthenticateRequest,
 }
 
 impl IntoResponse for ServerError {
@@ -108,6 +126,8 @@ impl IntoResponse for ServerError {
             ServerError::EnclaveError(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
             ServerError::StdinTooLarge(size) => (StatusCode::PAYLOAD_TOO_LARGE, format!("Stdin is too large, found {} bytes", size)).into_response(),
             ServerError::ProgramTooLarge(size) => (StatusCode::PAYLOAD_TOO_LARGE, format!("Program is too large, found {} bytes", size)).into_response(),
+            #[cfg(feature = "production")]
+            ServerError::FailedToAuthenticateRequest => (StatusCode::UNAUTHORIZED, "Failed to authenticate request").into_response(),
         }
     }
 }

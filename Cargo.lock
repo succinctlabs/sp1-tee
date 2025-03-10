@@ -6527,6 +6527,7 @@ dependencies = [
  "futures",
  "hex",
  "k256",
+ "lazy_static",
  "serde",
  "serde_json",
  "sp1-sdk",

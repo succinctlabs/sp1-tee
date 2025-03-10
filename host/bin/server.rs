@@ -143,7 +143,7 @@ async fn execute(
             Err(e) => {
                 tracing::error!(
                     alert = true,
-                    "Failed to authenticate request {}: {}", hex::encode(request.id), e
+                    "Failed to authenticate request by {:?}: {}", signer, e
                 );
 
                 return Err(ServerError::FailedToAuthenticateRequest);

@@ -1,3 +1,6 @@
+# Ensure we are in the directory of the script.
+pushd ../$(dirname $0)
+
 # TEMP: CANNOT USE PRIVATE REPOS IN DOCKER BUILDS
 git clone https://github.com/succinctlabs/sp1-wip.git
 
@@ -55,3 +58,5 @@ else
 fi
 
 echo "Done installing Nitro Enclaves CLI, exit the session and login again for changes to take effect."
+
+popd

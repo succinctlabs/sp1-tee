@@ -1,3 +1,6 @@
+# Ensure we are in the directory of the script.
+pushd $(dirname $0)
+
 # Install nginx.
 sudo dnf install -y nginx
 
@@ -12,3 +15,5 @@ sudo nginx -s reload
 
 # Start the server
 sudo nginx 
+
+popd

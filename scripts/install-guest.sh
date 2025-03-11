@@ -1,3 +1,5 @@
+pushd ../$(dirname $0)
+
 # Inspired by https://github.com/aws/aws-nitro-enclaves-sdk-c/blob/main/containers/Dockerfile.al2
 # todo!(n): proper attribution
 
@@ -110,3 +112,5 @@ echo "Done installing dependencies"
 
 popd
 sudo rm -rf tmp
+
+popd

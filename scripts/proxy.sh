@@ -1,6 +1,3 @@
-# Ensure we are in the directory of the script.
-pushd $(dirname $0)
-
 # Install nginx.
 sudo dnf install -y nginx
 
@@ -15,5 +12,3 @@ sudo systemctl enable --now nginx
 
 # Restart the service for idempotency.
 sudo systemctl restart nginx
-
-popd

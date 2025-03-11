@@ -1,6 +1,3 @@
-# Ensure we are in the directory of the script.
-pushd ../$(dirname $0)
-
 set -e
 
 COMMANDS=("build" "run" "terminate" "count")
@@ -79,5 +76,3 @@ if [[ $1 == "run" ]]; then
         nitro-cli console --enclave-name sp1-tee
     fi
 fi
-
-popd

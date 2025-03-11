@@ -1,8 +1,5 @@
 use axum::{
-    extract::State,
-    response::sse::{Event, Sse},
-    routing::{get, post},
-    Json, Router,
+    body::Bytes, extract::{Request, State}, response::sse::{Event, Sse}, routing::{get, post}, Json, Router
 };
 use clap::Parser;
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse};
@@ -128,11 +125,18 @@ async fn get_address(
 /// Execute a program on the enclave.
 ///
 /// In order to avoid OOM in the enclave, we run only one program at a time.
-#[tracing::instrument(skip_all, fields(id = hex::encode(request.id)))]
 async fn execute(
     State(server): State<Arc<Server>>,
-    Json(request): Json<TEERequest>,
+    req: Bytes,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, ServerError> {
+    let request = bincode::deserialize::<TEERequest>(&req).map_err(|e| {
+        tracing::error!(
+            "Failed to deserialize request: {}", e
+        );
+
+        ServerError::FailedToDeserializeRequest(e)
+    })?;
+
     #[cfg(feature = "production")]
     {
         let signer = request.signature.recover_address_from_msg(request.id).map_err(|_| {
@@ -159,8 +163,6 @@ async fn execute(
 
     let _guard = server.execution_mutex.lock().await;
 
-    tracing::info!("Executing request");
-
     let response = execute_inner(server.clone(), request);
     let response =
         stream::once(response).map(|response| Ok(sp1_tee_host::api::result_to_event(response)));
@@ -168,10 +170,13 @@ async fn execute(
     Ok(Sse::new(response))
 }
 
+#[tracing::instrument(skip_all, fields(id = hex::encode(request.id)))]
 async fn execute_inner(
     server: Arc<Server>,
     request: TEERequest,
 ) -> Result<TEEResponse, ServerError> {
+    tracing::info!("Starting execution");
+
     // Open a connection to the enclave.
     let mut stream = HostStream::new(server.cid, sp1_tee_common::ENCLAVE_PORT)
         .await

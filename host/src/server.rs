@@ -110,6 +110,9 @@ pub enum ServerError {
     #[error("Program is too large, found {0} bytes")]
     ProgramTooLarge(usize),
 
+    #[error("Failed to deserialize request, {0}")]
+    FailedToDeserializeRequest(bincode::Error),
+
     #[cfg(feature = "production")]
     #[error("Failed to authenticate request")]
     FailedToAuthenticateRequest,
@@ -126,6 +129,7 @@ impl IntoResponse for ServerError {
             ServerError::EnclaveError(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
             ServerError::StdinTooLarge(size) => (StatusCode::PAYLOAD_TOO_LARGE, format!("Stdin is too large, found {} bytes", size)).into_response(),
             ServerError::ProgramTooLarge(size) => (StatusCode::PAYLOAD_TOO_LARGE, format!("Program is too large, found {} bytes", size)).into_response(),
+            ServerError::FailedToDeserializeRequest(e) => (StatusCode::BAD_REQUEST, format!("Failed to deserialize request, {}", e)).into_response(),
             #[cfg(feature = "production")]
             ServerError::FailedToAuthenticateRequest => (StatusCode::UNAUTHORIZED, "Failed to authenticate request").into_response(),
         }

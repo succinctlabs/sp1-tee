@@ -157,8 +157,14 @@ async fn main() {
     } in attestations
     {
         // Verify the attestation.
-        let doc = sp1_tee_host::attestations::verify_attestation(&attestation)
-            .expect("Failed to verify attestation");
+        let doc = match sp1_tee_host::attestations::verify_attestation(&attestation) {
+            Ok(doc) => doc,
+            Err(e) => {
+                eprintln!("Failed to verify attestation for address: {:?}, error: {:?}", address, e);
+                eprintln!("Its possible this can happen if an enclave goes down, and the expiry period has not been reached yet.");
+                continue;
+            }
+        };
 
         // PCR0 is optional, as in debug mode PCR0 is empty in the attestation.
         if let Some(ref pcr0) = args.pcr0 {

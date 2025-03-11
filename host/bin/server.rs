@@ -1,5 +1,9 @@
 use axum::{
-    body::Bytes, extract::{Request, State}, response::sse::{Event, Sse}, routing::{get, post}, Json, Router
+    body::Bytes,
+    extract::{Request, State},
+    response::sse::{Event, Sse},
+    routing::{get, post},
+    Json, Router,
 };
 use clap::Parser;
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse};
@@ -11,8 +15,8 @@ use sp1_tee_host::{
     api::{TEERequest, TEEResponse},
     HostStream,
 };
-use std::sync::Arc;
 use std::convert::Infallible;
+use std::sync::Arc;
 use tokio::net::TcpListener;
 
 use futures::stream::{self, Stream, StreamExt};
@@ -20,6 +24,11 @@ use futures::stream::{self, Stream, StreamExt};
 #[tokio::main]
 async fn main() {
     sp1_tee_host::init_tracing();
+
+    // Tonic nonsense
+    // This comes from some crates relying on aws_lc
+    rustls::crypto::CryptoProvider::install_default(rustls::crypto::aws_lc_rs::default_provider())
+        .expect("Failed to install ring crypto provider");
 
     let args = ServerArgs::parse();
 
@@ -68,10 +77,7 @@ async fn get_address(
     let mut stream = HostStream::new(server.cid, sp1_tee_common::ENCLAVE_PORT)
         .await
         .map_err(|e| {
-            tracing::error!(
-                alert = true,
-                "Failed to connect to enclave: {}", e
-            );
+            tracing::error!(alert = true, "Failed to connect to enclave: {}", e);
 
             ServerError::FailedToConnectToEnclave
         })?;
@@ -80,10 +86,7 @@ async fn get_address(
         .send(EnclaveRequest::GetPublicKey)
         .await
         .map_err(|e| {
-            tracing::error!(
-                alert = true,
-                "Failed to send request to enclave: {}", e
-            );
+            tracing::error!(alert = true, "Failed to send request to enclave: {}", e);
 
             ServerError::FailedToSendRequestToEnclave
         })?;
@@ -91,7 +94,8 @@ async fn get_address(
     let response = stream.recv().await.map_err(|e| {
         tracing::error!(
             alert = true,
-            "Failed to receive response from enclave: {}", e
+            "Failed to receive response from enclave: {}",
+            e
         );
 
         ServerError::FailedToReceiveResponseFromEnclave
@@ -101,10 +105,7 @@ async fn get_address(
         EnclaveResponse::PublicKey(public_key) => {
             let Some(address) = sp1_tee_host::ethereum_address_from_encoded_point(&public_key)
             else {
-                tracing::error!(
-                    alert = true,
-                    "Failed to convert public key to address"
-                );
+                tracing::error!(alert = true, "Failed to convert public key to address");
 
                 return Err(ServerError::FailedToConvertPublicKeyToAddress);
             };
@@ -114,7 +115,8 @@ async fn get_address(
         _ => {
             tracing::error!(
                 alert = true,
-                "Unexpected response from enclave: {:?}", response
+                "Unexpected response from enclave: {:?}",
+                response
             );
 
             Err(ServerError::UnexpectedResponseFromEnclave)
@@ -130,22 +132,24 @@ async fn execute(
     req: Bytes,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, ServerError> {
     let request = bincode::deserialize::<TEERequest>(&req).map_err(|e| {
-        tracing::error!(
-            "Failed to deserialize request: {}", e
-        );
+        tracing::error!("Failed to deserialize request: {}", e);
 
         ServerError::FailedToDeserializeRequest(e)
     })?;
 
     #[cfg(feature = "production")]
     {
-        let signer = request.signature.recover_address_from_msg(request.id).map_err(|_| {
-            tracing::error!(
-                "Failed to recover signer address, request id: {}", hex::encode(request.id)
-            );
+        let signer = request
+            .signature
+            .recover_address_from_msg(request.id)
+            .map_err(|_| {
+                tracing::error!(
+                    "Failed to recover signer address, request id: {}",
+                    hex::encode(request.id)
+                );
 
-            ServerError::FailedToAuthenticateRequest
-        })?;
+                ServerError::FailedToAuthenticateRequest
+            })?;
 
         match server.auth_client.is_whitelisted(signer).await {
             Ok(true) => (),
@@ -153,7 +157,9 @@ async fn execute(
             Err(e) => {
                 tracing::error!(
                     alert = true,
-                    "Failed to authenticate request by {:?}: {}", signer, e
+                    "Failed to authenticate request by {:?}: {}",
+                    signer,
+                    e
                 );
 
                 return Err(ServerError::FailedToAuthenticateRequest);
@@ -181,10 +187,7 @@ async fn execute_inner(
     let mut stream = HostStream::new(server.cid, sp1_tee_common::ENCLAVE_PORT)
         .await
         .map_err(|e| {
-            tracing::error!(
-                alert = true,
-                "Failed to connect to enclave: {}", e
-            );
+            tracing::error!(alert = true, "Failed to connect to enclave: {}", e);
 
             ServerError::FailedToConnectToEnclave
         })?;
@@ -199,10 +202,7 @@ async fn execute_inner(
 
     // Send the request to the enclave.
     stream.send(request).await.map_err(|e| {
-        tracing::error!(
-            alert = true,
-            "Failed to send request to enclave: {}", e
-        );
+        tracing::error!(alert = true, "Failed to send request to enclave: {}", e);
 
         ServerError::FailedToSendRequestToEnclave
     })?;
@@ -213,7 +213,8 @@ async fn execute_inner(
     let response = stream.recv().await.map_err(|e| {
         tracing::error!(
             alert = true,
-            "Failed to receive response from enclave: {:?}", e
+            "Failed to receive response from enclave: {:?}",
+            e
         );
 
         ServerError::FailedToReceiveResponseFromEnclave
@@ -238,16 +239,15 @@ async fn execute_inner(
         }
         EnclaveResponse::Error(error) => {
             // This error type is expected, it can happen if the execution fails.
-            tracing::error!(
-                "Error during execution from enclave: {:?}", error
-            );
+            tracing::error!("Error during execution from enclave: {:?}", error);
 
             Err(ServerError::EnclaveError(error))
         }
         _ => {
             tracing::error!(
                 alert = true,
-                "Unexpected response from enclave: {:?}", response
+                "Unexpected response from enclave: {:?}",
+                response
             );
 
             Err(ServerError::UnexpectedResponseFromEnclave)

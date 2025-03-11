@@ -64,6 +64,7 @@ tonic = { version = "0.12", features = ["tls", "tls-roots"], optional = true }
 bincode.workspace = true
 serde_json = "1.0.140"
 lazy_static = "1.5.0"
+rustls = { version = "0.23.23", features = ["ring"] }
 
 [dev-dependencies]
 tokio = { workspace = true }

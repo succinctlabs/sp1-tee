@@ -36,8 +36,8 @@ struct Args {
 
     /// The private key to use.
     ///
-    /// This will otherwise be loaded from the env.
-    #[clap(long)]
+    /// This defaults to the anvil private key if not deploying.
+    #[clap(long, default_value_if("deploy", "false", "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"))]
     private_key: Option<String>,
 
     /// The etherscan API key to use.
@@ -81,7 +81,7 @@ async fn main() {
     // Global args.
     ///////////////////////////////
 
-    let args = Args::parse();
+    let mut args = Args::parse();
 
     let pk = unwrap_or_env(&args.private_key, "PRIVATE_KEY");
 
@@ -93,6 +93,11 @@ async fn main() {
     let provider = ProviderBuilder::new()
         .wallet(wallet)
         .on_http(args.rpc_url.parse().expect("Failed to parse RPC url"));
+
+    // This can only be reached iff `deploy` is true & the pk was taken from the env.
+    if args.private_key.is_none() {
+        args.private_key = Some(pk.clone());
+    }
 
     ///////////////////////////////
     // Deploy the contracts.
@@ -253,6 +258,8 @@ fn deploy_args<P: WalletProvider>(cmd: &mut Command, args: &Args, provider: &P) 
         "--broadcast",
         "--sender",
         &provider.default_signer_address().to_string(),
+        "--private-key",
+        &args.private_key.as_ref().clone().expect("Private key is not set"),
     ])
     .output()
     .expect("Failed to run forge script");

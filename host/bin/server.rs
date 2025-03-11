@@ -135,7 +135,13 @@ async fn execute(
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, ServerError> {
     #[cfg(feature = "production")]
     {
-        let signer = request.signature.recover_address_from_msg(request.id).expect("Failed to recover signer address");
+        let signer = request.signature.recover_address_from_msg(request.id).map_err(|_| {
+            tracing::error!(
+                "Failed to recover signer address, request id: {}", hex::encode(request.id)
+            );
+
+            ServerError::FailedToAuthenticateRequest
+        })?;
 
         match server.auth_client.is_whitelisted(signer).await {
             Ok(true) => (),

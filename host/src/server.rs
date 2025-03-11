@@ -141,7 +141,7 @@ pub fn start_enclave(args: &ServerArgs) {
     // Run the enclave.sh script.
     let mut command = std::process::Command::new("sh");
     command.current_dir(Path::new(MANIFEST_DIR).parent().unwrap());
-    command.arg("enclave.sh");
+    command.arg("scripts/enclave.sh");
     command.arg("run");
     if args.debug {
         command.arg("--debug");
@@ -184,7 +184,7 @@ pub fn terminate_enclaves() {
     command.stderr(std::process::Stdio::inherit());
     command.stdout(std::process::Stdio::inherit());
 
-    command.arg("enclave.sh");
+    command.arg("scripts/enclave.sh");
     command.arg("terminate");
 
     let output = command.output().expect("Failed to run enclave.sh");

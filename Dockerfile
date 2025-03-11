@@ -14,7 +14,7 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 WORKDIR app
 
-COPY install-guest.sh ./
+COPY scripts/install-guest.sh ./
 
 # Make sure your install-guest script is executable and run it
 RUN sed -i 's/sudo //g' ./install-guest.sh

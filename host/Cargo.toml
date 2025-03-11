@@ -33,10 +33,6 @@ name = "fibonacci"
 path = "examples/fibonacci.rs"
 required-features = ["client"]
 
-[[bin]]
-name = "redirect"
-path = "bin/redirect.rs"
-
 [dependencies]
 sp1-tee-common = { workspace = true }
 tokio-vsock = { workspace = true, optional = true }

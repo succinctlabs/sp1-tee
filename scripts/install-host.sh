@@ -54,4 +54,5 @@ else
     echo "To start the debug mode server: cargo run --bin sp1-tee-server -- --debug"
 fi
 
+echo "You will need to add ENV vars to use alerting, the default path for this is ~/.env"
 echo "Done installing Nitro Enclaves CLI, exit the session and login again for changes to take effect."

@@ -67,6 +67,8 @@ struct Args {
 
     /// An optional (hex-encoded) PCR0 to check against when verifying attestations.
     /// This ensures the correct program is being run on the enclave.
+    /// 
+    /// In debug mode, PCR0s are not included in the attestations.
     #[clap(long)]
     pcr0: Option<String>,
 

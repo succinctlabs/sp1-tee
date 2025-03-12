@@ -10,7 +10,7 @@ import {SP1Verifier} from "sp1-contracts/src/v4.0.0-rc.3/SP1VerifierPlonk.sol";
 contract DeployScript is Script {
     function run() public {
         vm.startBroadcast();
-        
+
         // The address of the verifier gateway.
         address gateway;
 

@@ -27,22 +27,28 @@ use tracing_subscriber::EnvFilter;
 ")]
 struct Args {
     /// Whether or not to deploy the contracts.
-    #[clap(long)]
+    #[clap(long, default_value_if("anvil", "true", "true"))]
     deploy: bool,
 
-    /// The RPC_URL to use.
-    #[clap(long)]
+    
+    /// Deploy to anvil.
+    #[clap(long, requires_if("false", "rpc_url"))]
+    anvil: bool,
+    
+    /// The RPC_URL to use, if anvil modes uses the default anvil port.
+    #[clap(long, required(false), default_value_if("anvil", "true", "http://localhost:8545"))]
     rpc_url: String,
 
     /// The private key to use.
     ///
-    /// This defaults to the anvil private key if not deploying.
+    /// This defaults to the anvil private key if not deploying or in anvil mode.
     #[clap(
         long,
-        default_value_if(
-            "deploy",
-            "false",
-            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+        default_value_ifs(
+            [
+                ("anvil", "true", "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"),
+                ("deploy", "false", "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"),
+            ]
         )
     )]
     private_key: Option<String>,
@@ -85,7 +91,7 @@ struct Deployment {
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or(EnvFilter::from("info")))
+        .with_env_filter(EnvFilter::from_default_env())
         .init();
 
     ///////////////////////////////
@@ -156,6 +162,8 @@ async fn main() {
     )
     .expect("Failed to parse deployment.json");
 
+    println!("Deployed Verifier: {:?}", deployment.sp1_tee_verifier);
+
     ///////////////////////////////
     // Add the signers
     ///////////////////////////////
@@ -181,6 +189,7 @@ async fn main() {
                     address, e
                 );
                 eprintln!("Its possible this can happen if an enclave goes down, and the expiry period has not been reached yet.");
+                eprintln!("");
                 continue;
             }
         };
@@ -234,6 +243,8 @@ async fn main() {
                 .watch()
                 .await
                 .expect("Failed to get confirmation of adding signer");
+
+            println!("Added signer: {:?}", address);
         } else {
             println!("Found valid signer: {:?}", address);
         }

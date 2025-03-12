@@ -46,7 +46,7 @@ sudo cp tee-service.template.service /etc/systemd/system/tee-service.service
 # Enable and start the tee-service if the --production flag is passed.
 if [ "$1" = "--production" ]; then
     # Install the tee server binary.
-    cargo install --path host --bin sp1-tee-server --features production
+    cargo install --path host --bin sp1-tee-server --features production --locked
     
     sudo systemctl enable --now tee-service.service
 else 

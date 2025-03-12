@@ -26,7 +26,7 @@ contract SP1TeeVerifierTest is Test {
 
     function setUp() public {
         sp1VerifierGateway = new SP1VerifierGateway(address(this));
-        sp1TeeVerifier = new SP1TeeVerifier(address(this));
+        sp1TeeVerifier = new SP1TeeVerifier(address(sp1VerifierGateway), address(this));
         sp1VerifierPlonk = new SP1VerifierPlonk();
 
         // Add message signer as a signer.

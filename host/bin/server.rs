@@ -25,11 +25,6 @@ use futures::stream::{self, Stream, StreamExt};
 async fn main() {
     sp1_tee_host::init_tracing();
 
-    // Tonic nonsense
-    // This comes from some crates relying on aws_lc
-    rustls::crypto::CryptoProvider::install_default(rustls::crypto::aws_lc_rs::default_provider())
-        .expect("Failed to install ring crypto provider");
-
     let args = ServerArgs::parse();
 
     // First, kill any existing enclaves.
@@ -153,7 +148,14 @@ async fn execute(
 
         match server.auth_client.is_whitelisted(signer).await {
             Ok(true) => (),
-            Ok(false) => return Err(ServerError::FailedToAuthenticateRequest),
+            Ok(false) => {
+                tracing::error!(
+                    "Failed to authenticate request by {:?}: Not whitelisted",
+                    signer
+                );
+
+                return Err(ServerError::FailedToAuthenticateRequest)
+            },
             Err(e) => {
                 tracing::error!(
                     alert = true,

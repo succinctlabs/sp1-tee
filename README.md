@@ -15,14 +15,17 @@ By default the enclave withholds 9GB and 12vCPU, this mean you'll need a host ma
 
 After ensuring that your EC2 instance meets these requirments, you must also enable the `Nitro Enclaves` setting in the Instance `Advanced Settings`. SSH into your machine and run the following command:
 
-`./install-host --production`
+`make install`
 
 This will:
 - Install the Nitro-CLI and Allocate the Enclave.
 - Install the `server` system service, by default listening on port 8080.
 - Start the `server`
 
-If you dont want to use the production constants, you can omit the flag and manually start the server this may be useful for reading from the console, as its only accsessible in debug mode.
+If you dont want to use the production constants, you can omit the flag and manually start the server
+
+`make install-debug`
+`DISABLE_ALERTS=1 cargo run --bin sp1-tee-server`
 
 ### ENV
 

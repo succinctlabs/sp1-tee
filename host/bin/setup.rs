@@ -37,7 +37,14 @@ struct Args {
     /// The private key to use.
     ///
     /// This defaults to the anvil private key if not deploying.
-    #[clap(long, default_value_if("deploy", "false", "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"))]
+    #[clap(
+        long,
+        default_value_if(
+            "deploy",
+            "false",
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+        )
+    )]
     private_key: Option<String>,
 
     /// The etherscan API key to use.
@@ -63,6 +70,10 @@ struct Args {
     /// Default is true if deploying.
     #[clap(long, default_value_if("deploy", "true", "true"))]
     register_signers: bool,
+
+    /// The address of the verifier gateway.
+    #[clap(long)]
+    verifier_gateway: Option<Address>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -165,7 +176,10 @@ async fn main() {
         let doc = match sp1_tee_host::attestations::verify_attestation(&attestation) {
             Ok(doc) => doc,
             Err(e) => {
-                eprintln!("Failed to verify attestation for address: {:?}, error: {:?}", address, e);
+                eprintln!(
+                    "Failed to verify attestation for address: {:?}, error: {:?}",
+                    address, e
+                );
                 eprintln!("Its possible this can happen if an enclave goes down, and the expiry period has not been reached yet.");
                 continue;
             }
@@ -188,7 +202,7 @@ async fn main() {
         let pubkey_bytes = doc
             .public_key
             .expect("Public key is not set in attestation");
-        
+
         let derived_address = ethereum_address_from_sec1_bytes(&pubkey_bytes)
             .expect("Failed to derive address from public key");
 
@@ -235,14 +249,25 @@ async fn main() {
 fn unwrap_or_env(value: &Option<String>, env_var: &str) -> String {
     match value {
         Some(value) => value.clone(),
-        None => std::env::var(env_var).expect(format!("{} env var is not set", env_var).as_str()),
+        None => std::env::var(env_var).expect(
+            format!(
+                "{} env var is not set, and was not provided in the Args.",
+                env_var
+            )
+            .as_str(),
+        ),
     }
 }
 
 fn deploy_args<P: WalletProvider>(cmd: &mut Command, args: &Args, provider: &P) {
     let etherscan_url = unwrap_or_env(&args.etherscan_url, "ETHERSCAN_URL");
     let etherscan_api_key = unwrap_or_env(&args.etherscan_api_key, "ETHERSCAN_API_KEY");
+    let verifier_gateway = unwrap_or_env(
+        &args.verifier_gateway.as_ref().map(|a| a.to_string()),
+        "SP1_VERIFIER_GATEWAY",
+    );
 
+    // NOTE: Private key is overriden on the `Args` type, so we don't check the env here.
     cmd.args(&[
         "script",
         "script/Deploy.s.sol",
@@ -259,8 +284,13 @@ fn deploy_args<P: WalletProvider>(cmd: &mut Command, args: &Args, provider: &P) 
         "--sender",
         &provider.default_signer_address().to_string(),
         "--private-key",
-        &args.private_key.as_ref().clone().expect("Private key is not set"),
+        &args
+            .private_key
+            .as_ref()
+            .clone()
+            .expect("Private key is not set"),
     ])
+    .env("SP1_VERIFIER_GATEWAY", &verifier_gateway)
     .output()
     .expect("Failed to run forge script");
 }

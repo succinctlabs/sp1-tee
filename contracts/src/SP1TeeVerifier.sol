@@ -24,11 +24,16 @@ contract SP1TeeVerifier is ISP1VerifierWithHash, SimpleOwnable {
     /// @notice The signers map.
     SignersMap signersMap;
 
+    /// @notice The verifier to delegate to.
+    ISP1Verifier immutable gateway;
+
     /// @notice The version of the verifier.
     uint256 public constant VERSION = 1;
 
     /// @notice Initializes the verifier, as well as the owner.
-    constructor(address _owner) SimpleOwnable(_owner) {}
+    constructor(address _gateway, address _owner) SimpleOwnable(_owner) {
+        gateway = ISP1Verifier(_gateway);
+    }
 
     /// @notice Adds a signer to the list of signers, after validating an attestation.
     ///
@@ -112,6 +117,6 @@ contract SP1TeeVerifier is ISP1VerifierWithHash, SimpleOwnable {
         // with the proof bytes stripped of the signature.
         //
         // Note: Assumes the caller is an ISP1Verifier.
-        ISP1Verifier(msg.sender).verifyProof(programVKey, publicValues, proofBytes[69:]);
+        gateway.verifyProof(programVKey, publicValues, proofBytes[69:]);
     }
 }

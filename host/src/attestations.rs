@@ -15,8 +15,8 @@ use aws_nitro_enclaves_nsm_api::api::AttestationDoc;
 use crate::ethereum_address_from_encoded_point;
 use crate::HostStream;
 
-// Attestations expire every 3 hours, so update every 2 hours.
-pub const ATTESTATION_INTERVAL: Duration = Duration::from_secs(2 * 60 * 60);
+// Attestations expire every 3 hours and we update every 30 mins.
+pub const ATTESTATION_INTERVAL: Duration = Duration::from_secs(30 * 60);
 
 /// Creates an S3 client from the environment variables.
 /// 

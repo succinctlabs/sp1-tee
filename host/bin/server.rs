@@ -1,6 +1,6 @@
 use axum::{
     body::Bytes,
-    extract::{Request, State},
+    extract::State,
     response::sse::{Event, Sse},
     routing::{get, post},
     Json, Router,

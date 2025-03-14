@@ -181,9 +181,11 @@ async fn execute_inner(
     server: Arc<Server>,
     request: TEERequest,
 ) -> Result<TEEResponse, ServerError> {
-    tracing::info!("Starting execution");
+    tracing::info!("Got execution request");
 
     let _guard = server.execution_mutex.lock().await;
+
+    tracing::info!("Acquired execution gurad");
 
     // Open a connection to the enclave.
     let mut stream = HostStream::new(server.cid, sp1_tee_common::ENCLAVE_PORT)

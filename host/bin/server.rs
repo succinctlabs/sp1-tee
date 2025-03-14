@@ -205,6 +205,7 @@ async fn execute_inner(
     };
 
     // Send the request to the enclave.
+    let execution_start = std::time::Instant::now();
     stream.send(request).await.map_err(|e| {
         tracing::error!(alert = true, "Failed to send request to enclave: {}", e);
 
@@ -223,6 +224,9 @@ async fn execute_inner(
 
         ServerError::FailedToReceiveResponseFromEnclave
     })?;
+
+    let execution_duration = execution_start.elapsed();
+    tracing::info!("Execution duration: {:?} seconds", execution_duration.as_secs());
 
     tracing::debug!("Successfully received response from enclave");
 

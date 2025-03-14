@@ -6528,6 +6528,7 @@ dependencies = [
  "hex",
  "k256",
  "lazy_static",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "sp1-sdk",

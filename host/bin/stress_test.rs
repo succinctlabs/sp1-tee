@@ -53,7 +53,12 @@ async fn main() {
                         .tee_proof(TEEProof::NitroIntegrity)
                         .await
                     {
-                        println!("Error getting proof for request {}: {}", i, e);
+                        tracing::error!(
+                            alert = true,
+                            "Enclave stress test error \n Error getting proof for request {}: {}",
+                            i,
+                            e
+                        );
                     }
                 }
             })

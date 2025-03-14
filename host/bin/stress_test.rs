@@ -63,7 +63,7 @@ async fn main() {
 
         println!("Completed {} requests", concurrent_requests);
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(sleep as u64)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(sleep as u64 * 60)).await;
 
         sleep = rng.gen_range(1..=60);
     }

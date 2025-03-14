@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use rand::Rng;
+use std::sync::Arc;
 
 use sp1_sdk::{Prover, ProverClient, TEEProof};
 
@@ -9,7 +9,7 @@ async fn main() {
 
     const RSP_ELF: &[u8] = include_bytes!("../../fixtures/rsp.elf");
     const RSP_INPUT: &[u8] = include_bytes!("../../fixtures/rsp-input.bin");
-    
+
     let mut stdin = sp1_sdk::SP1Stdin::new();
     stdin.write_slice(RSP_INPUT);
     let stdin = Arc::new(stdin);
@@ -20,7 +20,10 @@ async fn main() {
     let concurrent_requests_max: u32 = 25;
 
     let network_pk = std::env::var("NETWORK_PK").unwrap();
-    let prover = ProverClient::builder().network().private_key(&network_pk).build();
+    let prover = ProverClient::builder()
+        .network()
+        .private_key(&network_pk)
+        .build();
     let prover = Arc::new(prover);
 
     let (pk, _) = prover.setup(RSP_ELF);
@@ -35,17 +38,26 @@ async fn main() {
 
         println!("Starting {} requests", concurrent_requests);
 
-        let requests = (0..concurrent_requests).map(|i| {
-            let pk = pk.clone();
-            let prover = prover.clone();
-            let stdin = stdin.clone();
+        let requests = (0..concurrent_requests)
+            .map(|i| {
+                let pk = pk.clone();
+                let prover = prover.clone();
+                let stdin = stdin.clone();
 
-            async move {
-                if let Err(e) = prover.prove(&pk, &stdin).skip_simulation(true).tee_proof(TEEProof::NitroIntegrity).await {
-                    println!("Error getting proof for request {}: {}", i, e);
+                async move {
+                    if let Err(e) = prover
+                        .prove(&pk, &stdin)
+                        .compressed()
+                        .cycle_limit(900_000_000)
+                        .gas_limit(1000000000)
+                        .tee_proof(TEEProof::NitroIntegrity)
+                        .await
+                    {
+                        println!("Error getting proof for request {}: {}", i, e);
+                    }
                 }
-            }
-        }).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
 
         let _ = futures::future::join_all(requests).await;
 

@@ -5,6 +5,8 @@ use sp1_sdk::{Prover, ProverClient, TEEProof};
 
 #[tokio::main]
 async fn main() {
+    sp1_tee_host::init_tracing();
+
     const RSP_ELF: &[u8] = include_bytes!("../../fixtures/rsp.elf");
     const RSP_INPUT: &[u8] = include_bytes!("../../fixtures/rsp-input.bin");
     
@@ -15,7 +17,7 @@ async fn main() {
     // Initialize the RNG.
     let mut rng = rand::thread_rng();
 
-    let concurrent_requests_max: u32 = 50;
+    let concurrent_requests_max: u32 = 25;
 
     let network_pk = std::env::var("NETWORK_PK").unwrap();
     let prover = ProverClient::builder().network().private_key(&network_pk).build();

@@ -1,6 +1,6 @@
 use axum::{
     body::Bytes,
-    extract::State,
+    extract::{DefaultBodyLimit, State},
     response::sse::{Event, Sse},
     routing::{get, post},
     Json, Router,
@@ -38,7 +38,7 @@ async fn main() {
     let server = Server::new(&args);
 
     let app = Router::new()
-        .route("/execute", post(execute))
+        .route("/execute", post(execute).layer(DefaultBodyLimit::disable()))
         .route("/address", get(get_address))
         .with_state(server);
 

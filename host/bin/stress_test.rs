@@ -31,7 +31,7 @@ async fn main() {
     tracing::info!("Setup complete");
 
     // The number of minutes to sleep between requests.
-    let mut sleep: u32 = rng.gen_range(1..=20);
+    let mut sleep: u32 = rand_sleep();
 
     loop {
         let concurrent_requests = rng.gen_range(1..=concurrent_requests_max);
@@ -71,6 +71,11 @@ async fn main() {
 
         tokio::time::sleep(tokio::time::Duration::from_secs(sleep as u64 * 60)).await;
 
-        sleep = rng.gen_range(1..=60);
+        sleep = rand_sleep();
     }
+}
+
+fn rand_sleep() -> u32 {
+    let mut rng = rand::thread_rng();
+    rng.gen_range(1..=20)
 }

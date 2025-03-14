@@ -169,8 +169,6 @@ async fn execute(
         }
     }
 
-    let _guard = server.execution_mutex.lock().await;
-
     let response = execute_inner(server.clone(), request);
     let response =
         stream::once(response).map(|response| Ok(sp1_tee_host::api::result_to_event(response)));
@@ -184,6 +182,8 @@ async fn execute_inner(
     request: TEERequest,
 ) -> Result<TEEResponse, ServerError> {
     tracing::info!("Starting execution");
+
+    let _guard = server.execution_mutex.lock().await;
 
     // Open a connection to the enclave.
     let mut stream = HostStream::new(server.cid, sp1_tee_common::ENCLAVE_PORT)

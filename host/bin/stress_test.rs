@@ -55,7 +55,7 @@ async fn main() {
                     {
                         tracing::error!(
                             alert = true,
-                            "Enclave stress test error \n Error getting proof for request {}: {}",
+                            "Enclave stress test error \n Error getting proof for request {}: {:?}",
                             i,
                             e
                         );

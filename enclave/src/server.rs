@@ -79,8 +79,6 @@ impl Server {
                 .expect("Failed to accept connection");
 
             // Spawn a new (blocking) thread to handle the request.
-            //
-            // Tokio tasks aren't preferable here as exeuction (the most likely request type) should be considered blocking.
             tokio::task::spawn({
                 let this = this.clone();
 

@@ -25,6 +25,7 @@ async fn main() {
 
     let (pk, _) = prover.setup(RSP_ELF);
     let pk = Arc::new(pk);
+    tracing::info!("Setup complete");
 
     // The number of minutes to sleep between requests.
     let mut sleep: u32 = rng.gen_range(1..=60);
@@ -40,7 +41,7 @@ async fn main() {
             let stdin = stdin.clone();
 
             async move {
-                if let Err(e) = prover.prove(&pk, &stdin).tee_proof(TEEProof::NitroIntegrity).await {
+                if let Err(e) = prover.prove(&pk, &stdin).skip_simulation(true).tee_proof(TEEProof::NitroIntegrity).await {
                     println!("Error getting proof for request {}: {}", i, e);
                 }
             }

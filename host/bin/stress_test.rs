@@ -1,4 +1,5 @@
 use rand::Rng;
+use tracing::Instrument;
 use std::sync::Arc;
 
 use sp1_sdk::{Prover, ProverClient, TEEProof};
@@ -63,10 +64,17 @@ async fn main() {
 
                     tracing::info!("Completed request {}/{}", i, concurrent_requests);
                 }
+                .instrument(tracing::info_span!("request", i = i))
             })
             .collect::<Vec<_>>();
 
-        let _ = futures::future::join_all(requests).await;
+        if let Err(_) = tokio::time::timeout(
+            tokio::time::Duration::from_secs(60 * 15),
+            futures::future::join_all(requests),
+        )
+        .await {
+            tracing::error!("Timeout after 7 minutes");
+        }
 
         tracing::info!("Completed {} requests", concurrent_requests);
         tracing::info!("Sleeping for {} minutes", sleep);

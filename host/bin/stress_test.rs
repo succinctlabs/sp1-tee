@@ -60,6 +60,8 @@ async fn main() {
                             e
                         );
                     }
+
+                    tracing::info!("Completed request {}/{}", i, concurrent_requests);
                 }
             })
             .collect::<Vec<_>>();

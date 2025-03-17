@@ -30,7 +30,7 @@ RUN cmake --version
 RUN if [ "${DEBUG_MODE}" -eq "1" ]; then \
         cargo build --release --bin sp1-tee-enclave --features debug-mode; \
     else \
-        # We want to build with locked so we dont change the PCR values.
+        # Use --locked to ensure the build is reproducible.
         cargo build --release --bin sp1-tee-enclave --locked; \
     fi
 

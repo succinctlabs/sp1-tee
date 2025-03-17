@@ -13,6 +13,8 @@ use sp1_tee_common::{EnclaveRequest, EnclaveResponse, VsockStream};
 use std::sync::Arc;
 use tokio_vsock::{VsockAddr, VsockListener, VsockStream as VsockStreamRaw, VMADDR_CID_ANY};
 
+const MAX_ALLOWED_CYCLES: u64 = 50_000_000_000;
+
 enum ConnectionState {
     Continue,
     Close,
@@ -159,8 +161,8 @@ impl Server {
                     }
                 }
             }
-            EnclaveRequest::Execute { stdin, program } => {
-                match tokio::task::spawn_blocking(move || self.execute(stdin, program)).await {
+            EnclaveRequest::Execute { stdin, program, cycle_limit } => {
+                match tokio::task::spawn_blocking(move || self.execute(stdin, program, cycle_limit)).await {
                     Ok(response) => {
                         stream.send(response).await.unwrap();
                     }
@@ -250,7 +252,11 @@ impl Server {
     /// Executes a program with the given stdin and program.
     ///
     /// Sends a signature over the public values (and the vkey) to the host.
-    fn execute(&self, stdin: SP1Stdin, program: Vec<u8>) -> EnclaveResponse {
+    fn execute(&self, stdin: SP1Stdin, program: Vec<u8>, cycle_limit: u32) -> EnclaveResponse {
+        if cycle_limit > MAX_ALLOWED_CYCLES {
+            return EnclaveResponse::Error(format!("Cycle limit is too high: {}", cycle_limit));
+        }
+
         // Take the guard to ensure only one execution can be running at a time.
         let _guard = self.execution_guard.lock();
 
@@ -259,7 +265,7 @@ impl Server {
         debug_print!("Setup complete");
 
         // Defaults `true` for deferred proof verification.
-        match self.prover.execute(&program, &stdin).run() {
+        match self.prover.execute(&program, &stdin).cycle_limit(cycle_limit).run() {
             Ok((public_values, _)) => {
                 debug_print!("Execute complete");
 

@@ -25,7 +25,7 @@ pub enum EnclaveRequest {
     Execute {
         stdin: sp1_sdk::SP1Stdin,
         program: Vec<u8>,
-        cycle_limit: u32,
+        cycle_limit: u64,
     },
     /// Set the enclave's signing key.
     SetSigningKey(Vec<u8>),

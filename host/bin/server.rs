@@ -202,7 +202,7 @@ async fn execute_inner(
     let request = EnclaveRequest::Execute {
         program: request.program,
         stdin: request.stdin,
-        cycle_limit: request.cycle_limit,
+        cycle_limit: request.cycle_limit
     };
 
     // Send the request to the enclave.

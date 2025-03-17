@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tokio_vsock::{VsockAddr, VsockListener, VsockStream as VsockStreamRaw, VMADDR_CID_ANY};
 use sp1_prover::SP1_CIRCUIT_VERSION;
 
-const MAX_ALLOWED_CYCLES: u32 = u32::MAX;
+const MAX_ALLOWED_CYCLES: u64 = u32::MAX as u64;
 
 enum ConnectionState {
     Continue,
@@ -253,7 +253,7 @@ impl Server {
     /// Executes a program with the given stdin and program.
     ///
     /// Sends a signature over the public values (and the vkey) to the host.
-    fn execute(&self, stdin: SP1Stdin, program: Vec<u8>, cycle_limit: u32) -> EnclaveResponse {
+    fn execute(&self, stdin: SP1Stdin, program: Vec<u8>, cycle_limit: u64) -> EnclaveResponse {
         if cycle_limit > MAX_ALLOWED_CYCLES {
             return EnclaveResponse::Error(format!("Cycle limit is too high: {}, max: {}", cycle_limit, MAX_ALLOWED_CYCLES));
         }
@@ -266,7 +266,7 @@ impl Server {
         debug_print!("Setup complete");
 
         // Defaults `true` for deferred proof verification.
-        match self.prover.execute(&program, &stdin).cycle_limit(cycle_limit as u64).run() {
+        match self.prover.execute(&program, &stdin).cycle_limit(cycle_limit).run() {
             Ok((public_values, _)) => {
                 debug_print!("Execute complete");
 

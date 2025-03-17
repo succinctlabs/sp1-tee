@@ -13,7 +13,7 @@ use sp1_tee_common::{EnclaveRequest, EnclaveResponse, VsockStream};
 use std::sync::Arc;
 use tokio_vsock::{VsockAddr, VsockListener, VsockStream as VsockStreamRaw, VMADDR_CID_ANY};
 
-const MAX_ALLOWED_CYCLES: u64 = 50_000_000_000;
+const MAX_ALLOWED_CYCLES: u32 = u32::MAX;
 
 enum ConnectionState {
     Continue,
@@ -265,7 +265,7 @@ impl Server {
         debug_print!("Setup complete");
 
         // Defaults `true` for deferred proof verification.
-        match self.prover.execute(&program, &stdin).cycle_limit(cycle_limit).run() {
+        match self.prover.execute(&program, &stdin).cycle_limit(cycle_limit as u64).run() {
             Ok((public_values, _)) => {
                 debug_print!("Execute complete");
 

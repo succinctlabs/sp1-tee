@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ISP1Verifier, ISP1VerifierWithHash} from "sp1-contracts/src/ISP1Verifier.sol";
+import {ISP1VerifierGateway, ISP1Verifier} from "sp1-contracts/src/ISP1VerifierGateway.sol";
 import {SimpleOwnable} from "./SimpleOwnable.sol";
 import {IterableMap, SignersMap} from "./SignersMap.sol";
 
@@ -9,7 +9,7 @@ import {IterableMap, SignersMap} from "./SignersMap.sol";
 /// @author Succinct Labs
 /// @notice This contract is a wrapper around any SP1 verifier that additionally verifies
 ///         a signature over the public values and program vkey.
-contract SP1TeeVerifier is ISP1VerifierWithHash, SimpleOwnable {
+contract SP1TeeVerifier is ISP1Verifier, SimpleOwnable {
     using IterableMap for SignersMap;
 
     /// @notice Thrown when the proof bytes appear to be invalid.
@@ -25,14 +25,14 @@ contract SP1TeeVerifier is ISP1VerifierWithHash, SimpleOwnable {
     SignersMap signersMap;
 
     /// @notice The verifier to delegate to.
-    ISP1Verifier immutable gateway;
+    ISP1VerifierGateway immutable gateway;
 
     /// @notice The version of the verifier.
     uint256 public constant VERSION = 1;
 
     /// @notice Initializes the verifier, as well as the owner.
     constructor(address _gateway, address _owner) SimpleOwnable(_owner) {
-        gateway = ISP1Verifier(_gateway);
+        gateway = ISP1VerifierGateway(_gateway);
     }
 
     /// @notice Adds a signer to the list of signers, after validating an attestation.
@@ -92,9 +92,13 @@ contract SP1TeeVerifier is ISP1VerifierWithHash, SimpleOwnable {
         uint8 v = uint8(proofBytes[4]); // 1 byte: v
         bytes32 r = bytes32(proofBytes[5:37]); // 32 bytes: r
         bytes32 s = bytes32(proofBytes[37:69]); // 32 bytes: s
+        
+        // Extract the version from the proof bytes.
+        uint8 version_len = uint8(proofBytes[69]); // 1 byte: version_len
+        bytes memory version = proofBytes[70:70 + version_len]; // version_len bytes: version
 
         // compute the expected hash of the message
-        bytes32 message_hash = keccak256(abi.encodePacked(programVKey, publicValues));
+        bytes32 message_hash = keccak256(abi.encodePacked(version, programVKey, publicValues));
 
         // Validate the recovery id.
         if (v != 27 && v != 28) {
@@ -117,6 +121,6 @@ contract SP1TeeVerifier is ISP1VerifierWithHash, SimpleOwnable {
         // with the proof bytes stripped of the signature.
         //
         // Note: Assumes the caller is an ISP1Verifier.
-        gateway.verifyProof(programVKey, publicValues, proofBytes[69:]);
+        gateway.verifyProof(programVKey, publicValues, proofBytes[70 + version_len:]);
     }
 }

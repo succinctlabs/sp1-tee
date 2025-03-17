@@ -15,6 +15,7 @@ sp1-tee-common = { workspace = true }
 
 # executor
 sp1-sdk = { workspace = true }
+sp1-prover = { workspace = true }
 
 # Transport deps.
 tokio-vsock = { workspace = true }

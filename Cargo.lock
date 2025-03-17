@@ -6503,6 +6503,7 @@ dependencies = [
  "parking_lot",
  "rand_core 0.6.4",
  "sha3",
+ "sp1-prover",
  "sp1-sdk",
  "sp1-tee-common",
  "thiserror 1.0.69",

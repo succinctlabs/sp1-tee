@@ -254,7 +254,7 @@ impl Server {
     /// Sends a signature over the public values (and the vkey) to the host.
     fn execute(&self, stdin: SP1Stdin, program: Vec<u8>, cycle_limit: u32) -> EnclaveResponse {
         if cycle_limit > MAX_ALLOWED_CYCLES {
-            return EnclaveResponse::Error(format!("Cycle limit is too high: {}", cycle_limit));
+            return EnclaveResponse::Error(format!("Cycle limit is too high: {}, max: {}", cycle_limit, MAX_ALLOWED_CYCLES));
         }
 
         // Take the guard to ensure only one execution can be running at a time.

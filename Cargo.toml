@@ -30,3 +30,4 @@ alert-subscriber = { git = "https://github.com/succinctlabs/alert-subscriber.git
 # TEMP: Use local sp1-wip repo for now.
 # TODO: Change this to public when merged.
 sp1-sdk = { path = "sp1-wip/crates/sdk" }
+sp1-prover = { path = "sp1-wip/crates/prover" }

@@ -12,6 +12,7 @@ use sp1_sdk::{CpuProver, HashableKey, Prover, SP1Stdin};
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse, VsockStream};
 use std::sync::Arc;
 use tokio_vsock::{VsockAddr, VsockListener, VsockStream as VsockStreamRaw, VMADDR_CID_ANY};
+use sp1_prover::SP1_CIRCUIT_VERSION;
 
 const MAX_ALLOWED_CYCLES: u32 = u32::MAX;
 
@@ -270,8 +271,9 @@ impl Server {
                 debug_print!("Execute complete");
 
                 let vkey_raw = vk.bytes32_raw();
+                let version_bytes = SP1_CIRCUIT_VERSION.as_bytes().to_vec();
 
-                let to_sign = [vkey_raw.to_vec(), public_values.to_vec()].concat();
+                let to_sign = [vkey_raw.to_vec(), public_values.to_vec(), vec![version_bytes.len() as u8], version_bytes].concat();
 
                 let hasher = sha3::Keccak256::new_with_prefix(to_sign.as_slice());
 

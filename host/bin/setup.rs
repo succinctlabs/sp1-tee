@@ -42,6 +42,8 @@ struct Args {
     /// The private key to use.
     ///
     /// This defaults to the anvil private key if not deploying or in anvil mode.
+    /// 
+    /// ENV VAR: `PRIVATE_KEY`
     #[clap(
         long,
         default_value_ifs(
@@ -56,12 +58,16 @@ struct Args {
     /// The etherscan API key to use.
     ///
     /// This will otherwise be loaded from the env, ignored if deploying to anvil.
+    /// 
+    /// ENV VAR: `ETHERSCAN_API_KEY`
     #[clap(long)]
     etherscan_api_key: Option<String>,
 
     /// The etherscan URL to use.
     ///
     /// This will otherwise be loaded from the env, ignored if deploying to anvil.
+    /// 
+    /// ENV VAR: `ETHERSCAN_URL`
     #[clap(long)]
     etherscan_url: Option<String>,
 
@@ -80,6 +86,8 @@ struct Args {
     register_signers: bool,
 
     /// The address of the verifier gateway.
+    /// 
+    /// ENV VAR: `SP1_VERIFIER_GATEWAY`
     #[clap(long)]
     verifier_gateway: Option<Address>,
 }
@@ -131,7 +139,7 @@ async fn main() {
         command.current_dir("contracts");
 
         // If the RPC url is anvil, we need to use the anvil deploy args
-        if args.rpc_url.starts_with("http") {
+        if !args.rpc_url.starts_with("https://") {
             anvil_deploy_args(&mut command, &args, &provider);
         } else {
             deploy_args(&mut command, &args, &provider);
@@ -139,8 +147,6 @@ async fn main() {
 
         // Run the command, piping the output to the parent process.
         let output = command
-            .arg("--private-key")
-            .arg(pk)
             .stderr(Stdio::inherit())
             .stdout(Stdio::inherit())
             .output()
@@ -273,39 +279,36 @@ fn unwrap_or_env(value: &Option<String>, env_var: &str) -> String {
 }
 
 fn deploy_args<P: WalletProvider>(cmd: &mut Command, args: &Args, provider: &P) {
-    let etherscan_url = unwrap_or_env(&args.etherscan_url, "ETHERSCAN_URL");
+    // let etherscan_url = unwrap_or_env(&args.etherscan_url, "ETHERSCAN_URL");
     let etherscan_api_key = unwrap_or_env(&args.etherscan_api_key, "ETHERSCAN_API_KEY");
     let verifier_gateway = unwrap_or_env(
         &args.verifier_gateway.as_ref().map(|a| a.to_string()),
         "SP1_VERIFIER_GATEWAY",
     );
 
+    println!("Deploying contracts with verifier gateway: {}", verifier_gateway);
+
     // NOTE: Private key is overriden on the `Args` type, so we don't check the env here.
-    cmd.args(&[
-        "script",
-        "script/Deploy.s.sol",
-        "--rpc-url",
-        &args.rpc_url,
-        "--verify",
-        "--verifier",
-        "etherscan",
-        "--verifier-url",
-        &etherscan_url,
-        "--verifier-api-key",
-        &etherscan_api_key,
-        "--broadcast",
-        "--sender",
-        &provider.default_signer_address().to_string(),
-        "--private-key",
-        &args
-            .private_key
-            .as_ref()
-            .clone()
-            .expect("Private key is not set"),
-    ])
-    .env("SP1_VERIFIER_GATEWAY", &verifier_gateway)
-    .output()
-    .expect("Failed to run forge script");
+    cmd
+        .env("SP1_VERIFIER_GATEWAY", &verifier_gateway)
+        .args(&[
+            "script",
+            "script/Deploy.s.sol",
+            "--rpc-url",
+            &args.rpc_url,
+            "--verify",
+            "--etherscan-api-key",
+            &etherscan_api_key,
+            "--broadcast",
+            "--sender",
+            &provider.default_signer_address().to_string(),
+            "--private-key",
+            &args
+                .private_key
+                .as_ref()
+                .clone()
+                .expect("Private key is not set"),
+        ]);
 }
 
 fn anvil_deploy_args<P: WalletProvider>(cmd: &mut Command, args: &Args, provider: &P) {

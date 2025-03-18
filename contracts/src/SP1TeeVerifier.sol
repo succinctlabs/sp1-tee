@@ -25,7 +25,7 @@ contract SP1TeeVerifier is ISP1Verifier, SimpleOwnable {
     SignersMap signersMap;
 
     /// @notice The verifier to delegate to.
-    ISP1VerifierGateway immutable gateway;
+    ISP1VerifierGateway public immutable gateway;
 
     /// @notice The version of the verifier.
     uint256 public constant VERSION = 1;

@@ -40,5 +40,8 @@ FROM public.ecr.aws/amazonlinux/amazonlinux:2023
 # Copy the binary from the build stage
 COPY --from=builder /app/target/release/sp1-tee-enclave /usr/local/bin/sp1-tee-enclave
 
+# Allow 1 Billion total unconstrained cycles.
+ENV UNCONSTRAINED_CYCLE_LIMIT=1000000000
+
 # Set the entrypoint to the enclave binary.
 ENTRYPOINT ["/usr/local/bin/sp1-tee-enclave", "--enc-key-arn", "none"]

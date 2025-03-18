@@ -92,7 +92,7 @@ contract SP1TeeVerifier is ISP1Verifier, SimpleOwnable {
         uint8 v = uint8(proofBytes[4]); // 1 byte: v
         bytes32 r = bytes32(proofBytes[5:37]); // 32 bytes: r
         bytes32 s = bytes32(proofBytes[37:69]); // 32 bytes: s
-        
+
         // Extract the version from the proof bytes.
         uint8 version_len = uint8(proofBytes[69]); // 1 byte: version_len
         bytes memory version = proofBytes[70:70 + version_len]; // version_len bytes: version

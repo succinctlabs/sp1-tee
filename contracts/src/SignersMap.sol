@@ -12,6 +12,9 @@ struct SignersMap {
     mapping(address => uint256) signerIndex;
 }
 
+/// @dev A library for managing a [`SignersMap`].
+///
+/// @dev This library uses "swap and pop" to remove a signer from the list in constant time.
 library IterableMap {
     function addSigner(SignersMap storage self, address signer) internal {
         if (self.map[signer]) {
@@ -40,22 +43,23 @@ library IterableMap {
         uint256 indexToRemove = self.signerIndex[signer];
         delete self.signerIndex[signer];
 
-        if (self.signers.length == 1) {
+        uint256 length = self.signers.length;
+        if (length == 1) {
             self.signers.pop();
 
             return;
         }
 
         // Remove the signer from the list, by replacing it with the last signer in the list.
-        address lastSigner = self.signers[self.signers.length - 1];
+        address lastSigner = self.signers[length - 1];
 
         // Move the last signer to the index of the signer to remove.
         self.signers[indexToRemove] = lastSigner;
 
         // Update the index of the last signer.
-        self.signerIndex[lastSigner] = self.signerIndex[signer];
+        self.signerIndex[lastSigner] = indexToRemove;
 
-        // Update the index of the signer.
+        // Pop the last signer from the list.
         self.signers.pop();
     }
 

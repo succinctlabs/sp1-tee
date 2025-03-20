@@ -24,6 +24,10 @@ contract IterableMapTest {
     function getSignersLength() public view returns (uint256) {
         return signersMap.getSignersLength();
     }
+
+    function signersIndex(address signer) public view returns (uint256) {
+        return signersMap.signerIndex[signer];
+    }
 }
 
 contract SP1TeeTest is Test {
@@ -86,6 +90,30 @@ contract SP1TeeTest is Test {
         iterableMapTest.setSigner(address(1));
         vm.expectRevert("Signer already exists");
         iterableMapTest.setSigner(address(1));
+    }
+
+    function testExpectedIndexAfterRemovingSigner() public {
+        iterableMapTest.setSigner(address(1));
+        iterableMapTest.setSigner(address(2));
+        iterableMapTest.setSigner(address(3));
+        iterableMapTest.setSigner(address(4));
+
+        // Remove the first and second signer.
+        iterableMapTest.removeSigner(address(1));
+        iterableMapTest.removeSigner(address(2));
+
+        // We should expect that the index of the removed signers is now 0 (removed from the list).
+        assertEq(iterableMapTest.signersIndex(address(1)), 0);
+        assertEq(iterableMapTest.signersIndex(address(2)), 0);
+
+        // We should expect that the index of the fourth signer is now 0.
+        // While the index is 0, its actually included in the list, this is fine
+        // because we dont use the index to check inclusion.
+        assertEq(iterableMapTest.signersIndex(address(4)), 0);
+
+        // We should expect that the index of the third signer is now 1.
+        assertEq(iterableMapTest.signersIndex(address(3)), 1);
+
     }
 
     function testCannotRemoveNonExistentSigner() public {

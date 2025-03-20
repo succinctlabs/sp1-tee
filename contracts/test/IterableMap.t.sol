@@ -113,7 +113,6 @@ contract SP1TeeTest is Test {
 
         // We should expect that the index of the third signer is now 1.
         assertEq(iterableMapTest.signersIndex(address(3)), 1);
-
     }
 
     function testCannotRemoveNonExistentSigner() public {

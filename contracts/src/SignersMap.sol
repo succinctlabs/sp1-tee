@@ -43,8 +43,9 @@ library IterableMap {
         uint256 indexToRemove = self.signerIndex[signer];
         delete self.signerIndex[signer];
 
+        // If were dealing with the last signer, we can just pop the list.
         uint256 length = self.signers.length;
-        if (length == 1) {
+        if (indexToRemove == length - 1) {
             self.signers.pop();
 
             return;

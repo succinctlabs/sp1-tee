@@ -115,6 +115,15 @@ contract SP1TeeTest is Test {
         assertEq(iterableMapTest.signersIndex(address(3)), 1);
     }
 
+    function testRemoveLastSignerCorrectIndex() public {
+        iterableMapTest.setSigner(address(1));
+        iterableMapTest.setSigner(address(2));
+        iterableMapTest.setSigner(address(3));
+        iterableMapTest.removeSigner(address(3));
+
+        assertEq(iterableMapTest.signersIndex(address(3)), 0);
+    }
+
     function testCannotRemoveNonExistentSigner() public {
         vm.expectRevert("Signer does not exist");
         iterableMapTest.removeSigner(address(1));

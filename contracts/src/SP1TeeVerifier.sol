@@ -21,6 +21,12 @@ contract SP1TeeVerifier is ISP1Verifier, SimpleOwnable {
     /// @notice Thrown when the recovery id is invalid.
     error InvalidRecoveryId(uint8 v);
 
+    /// @notice Emitted when a signer is added.
+    event SignerAdded(address signer);
+
+    /// @notice Emitted when a signer is removed.
+    event SignerRemoved(address signer);
+
     /// @notice The signers map.
     SignersMap signersMap;
 
@@ -43,6 +49,8 @@ contract SP1TeeVerifier is ISP1Verifier, SimpleOwnable {
             revert("Signer cannot be the zero address");
         }
         signersMap.addSigner(signer);
+
+        emit SignerAdded(signer);
     }
 
     /// @notice Removes a signer from the list of signers.
@@ -50,6 +58,8 @@ contract SP1TeeVerifier is ISP1Verifier, SimpleOwnable {
     /// @dev Only the owner can remove a signer.
     function removeSigner(address signer) external onlyOwner {
         signersMap.removeSigner(signer);
+
+        emit SignerRemoved(signer);
     }
 
     /// @notice Returns the list of signers.

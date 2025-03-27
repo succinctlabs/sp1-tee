@@ -71,6 +71,7 @@ struct GetVersionedSignersRequest {
     pcr0: Option<String>,
 }
 
+#[tracing::instrument(skip_all)]
 async fn get_all_signers_for_version(
     Query(params): Query<GetVersionedSignersRequest>,
 ) -> Result<Bytes, ServerError> {
@@ -80,7 +81,11 @@ async fn get_all_signers_for_version(
         sp1_tee_host::server::get_enclave_measurement().await?.pcr0
     };
 
+    tracing::info!("PCR0: {}", measurement);
+
     let all_attestations = sp1_tee_host::attestations::get_raw_attestations().await?;
+
+    tracing::info!("Found {} attestations", all_attestations.len());
 
     let signers = all_attestations.iter()
         .filter_map(|raw| {
@@ -99,6 +104,8 @@ async fn get_all_signers_for_version(
             }
         })
         .collect::<Result<Vec<_>, _>>()?;
+
+    tracing::info!("Found {} signers", signers.len());
 
     Ok(bincode::serialize(&signers).expect("failed to serialize signers").into())
 }

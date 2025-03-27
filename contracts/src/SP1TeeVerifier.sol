@@ -26,6 +26,8 @@ contract SP1TeeVerifier is ISP1Verifier, SimpleOwnable {
 
     /// @notice Emitted when a signer is removed.
     event SignerRemoved(address signer);
+    /// @notice Thrown when the proof bytes are too short.
+    error ProofBytesTooShort(uint256 receivedLength, uint256 expectedLength);
 
     /// @notice The signers map.
     SignersMap signersMap;
@@ -93,6 +95,10 @@ contract SP1TeeVerifier is ISP1Verifier, SimpleOwnable {
     /// @dev For more information about signature related attacks see:
     ///      https://scsfg.io/hackers/signature-attacks
     function verifyProof(bytes32 programVKey, bytes calldata publicValues, bytes calldata proofBytes) external view {
+        if (proofBytes.length < 70) {
+            revert ProofBytesTooShort(proofBytes.length, 70);
+        }
+
         // Assure the proof type is correct for this verifier.
         bytes4 receivedSelector = bytes4(proofBytes[:4]);
         bytes4 expectedSelector = bytes4(VERIFIER_HASH());
@@ -120,8 +126,8 @@ contract SP1TeeVerifier is ISP1Verifier, SimpleOwnable {
         if (v != 27 && v != 28) {
             revert InvalidRecoveryId(v);
         }
-
         // Recover the signer from the signature.
+
         address signer = ecrecover(message_hash, v, r, s);
         if (signer == address(0)) {
             // Note: ecrecover can return address(0) if the signature is unrecoverable.

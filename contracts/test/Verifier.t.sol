@@ -95,8 +95,11 @@ contract SP1TeeVerifierTest is Test {
         bytes4 selector = bytes4(ISP1VerifierWithHash(address(sp1TeeVerifier)).VERIFIER_HASH());
         console.logBytes4(selector);
 
-        // The message is of the form keccak256([ vkey || publicValues ])
-        bytes32 message_hash = keccak256(abi.encodePacked(VERSION, vkey, publicValues));
+        bytes32 publicValuesHash = keccak256(abi.encodePacked(publicValues));
+        bytes32 versionHash = keccak256(abi.encodePacked(VERSION));
+
+        // The message is of the form keccak256([ VERSION_HASH || vkey || publicValuesHash ])
+        bytes32 message_hash = keccak256(abi.encodePacked(versionHash, vkey, publicValuesHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signer, message_hash);
 
         // The proof the TEE verifier expects is of the form:

@@ -100,7 +100,11 @@ contract SP1TeeVerifier is ISP1Verifier, SimpleOwnable {
         bytes memory version = proofBytes[70:70 + version_len]; // version_len bytes: version
 
         // Compute the expected hash of the message
-        bytes32 message_hash = keccak256(abi.encodePacked(version, programVKey, publicValues));
+        bytes32 message_hash = keccak256(
+            abi.encodePacked(
+                keccak256(abi.encodePacked(version)), programVKey, keccak256(abi.encodePacked(publicValues))
+            )
+        );
 
         // Validate the recovery id.
         if (v != 27 && v != 28) {

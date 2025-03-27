@@ -270,10 +270,16 @@ impl Server {
             Ok((public_values, _)) => {
                 debug_print!("Execute complete");
 
-                let vkey_raw = vk.bytes32_raw();
-                let version_bytes = SP1_CIRCUIT_VERSION.as_bytes().to_vec();
+                // Hash the public values.
+                let public_values_hash = sha3::Keccak256::new_with_prefix(public_values.as_slice()).finalize();
 
-                let to_sign = [version_bytes, vkey_raw.to_vec(), public_values.to_vec()].concat();
+                let vkey_raw = vk.bytes32_raw();
+                
+                // Hash the version bytes.
+                let version_bytes = SP1_CIRCUIT_VERSION.as_bytes().to_vec();
+                let version_bytes_hash = sha3::Keccak256::new_with_prefix(version_bytes.as_slice()).finalize();
+                
+                let to_sign = [version_bytes_hash.to_vec(), vkey_raw.to_vec(), public_values_hash.to_vec()].concat();
 
                 let hasher = sha3::Keccak256::new_with_prefix(to_sign.as_slice());
 

@@ -75,6 +75,8 @@ struct GetVersionedSignersRequest {
 async fn get_all_signers_for_version(
     Query(params): Query<GetVersionedSignersRequest>,
 ) -> Result<Bytes, ServerError> {
+    tracing::info!("Handling get all signers for version request");
+
     let measurement = if let Some(pcr0) = params.pcr0 {
         pcr0
     } else {

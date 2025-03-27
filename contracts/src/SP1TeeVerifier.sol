@@ -12,6 +12,8 @@ import {IterableMap, SignersMap} from "./SignersMap.sol";
 contract SP1TeeVerifier is ISP1Verifier, SimpleOwnable {
     using IterableMap for SignersMap;
 
+    /////////////////////////////// Errors and Events ///////////////////////////////
+
     /// @notice Thrown when the proof bytes appear to be invalid.
     error WrongVerifierSelector(bytes4 receivedSelector, bytes4 expectedSelector);
 
@@ -26,8 +28,11 @@ contract SP1TeeVerifier is ISP1Verifier, SimpleOwnable {
 
     /// @notice Emitted when a signer is removed.
     event SignerRemoved(address signer);
+
     /// @notice Thrown when the proof bytes are too short.
     error ProofBytesTooShort(uint256 receivedLength, uint256 expectedLength);
+
+    /////////////////////////////// State ///////////////////////////////
 
     /// @notice The signers map.
     SignersMap signersMap;
@@ -38,10 +43,14 @@ contract SP1TeeVerifier is ISP1Verifier, SimpleOwnable {
     /// @notice The version of the verifier.
     uint256 public constant VERSION = 1;
 
+    /////////////////////////////// Constructor ///////////////////////////////
+
     /// @notice Initializes the verifier, as well as the owner.
     constructor(address _gateway, address _owner) SimpleOwnable(_owner) {
         gateway = ISP1VerifierGateway(_gateway);
     }
+
+    /////////////////////////////// Only Owner Functions ///////////////////////////////
 
     /// @notice Adds a signer to the list of signers, after validating an attestation.
     ///
@@ -63,6 +72,8 @@ contract SP1TeeVerifier is ISP1Verifier, SimpleOwnable {
 
         emit SignerRemoved(signer);
     }
+
+    /////////////////////////////// Public & External Functions ///////////////////////////////
 
     /// @notice Returns the list of signers.
     ///
@@ -126,8 +137,8 @@ contract SP1TeeVerifier is ISP1Verifier, SimpleOwnable {
         if (v != 27 && v != 28) {
             revert InvalidRecoveryId(v);
         }
-        // Recover the signer from the signature.
 
+        // Recover the signer from the signature.
         address signer = ecrecover(message_hash, v, r, s);
         if (signer == address(0)) {
             // Note: ecrecover can return address(0) if the signature is unrecoverable.

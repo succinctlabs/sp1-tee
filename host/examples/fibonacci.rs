@@ -56,6 +56,7 @@ async fn main() {
 
     // Verify the proof with the rust verifier
     prover.verify(&proof, &vk).unwrap();
+    println!("Proof verified with rust verifier");
 
     if let Some(verifier) = args.verifier {
         let provider = anvil_provider();

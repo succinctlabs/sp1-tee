@@ -2,12 +2,12 @@ use std::time::Duration;
 
 use alloy::hex::FromHexError;
 use alloy::primitives::Address;
-use attestation_doc_validation::error::AttestResult;
+use attestation_doc_validation::error::{AttestError, AttestResult};
+use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Error;
 use aws_sdk_s3::primitives::ByteStreamError;
 use aws_sdk_s3::{error::SdkError, operation::put_object::PutObjectError};
-use aws_config::{BehaviorVersion, Region};
 use sp1_tee_common::{CommunicationError, EnclaveRequest, EnclaveResponse};
 
 use aws_nitro_enclaves_nsm_api::api::AttestationDoc;
@@ -19,11 +19,11 @@ use crate::HostStream;
 pub const ATTESTATION_INTERVAL: Duration = Duration::from_secs(30 * 60);
 
 /// Creates an S3 client from the environment variables.
-/// 
+///
 /// For EC2 instances, the environment variables are set automatically.
-/// 
+///
 /// # Panics
-/// 
+///
 /// This function will panic if the environment variables are not set.
 pub async fn s3_client() -> aws_sdk_s3::Client {
     // Loads from environment variables.
@@ -36,7 +36,6 @@ pub async fn s3_client() -> aws_sdk_s3::Client {
     // Create the S3 client.
     aws_sdk_s3::Client::new(&aws_config)
 }
-
 
 #[derive(Debug)]
 pub struct SaveAttestationArgs {
@@ -125,7 +124,7 @@ pub async fn save_attestation(args: SaveAttestationArgs) -> Result<(), SaveAttes
         .body(attestation.into())
         .send()
         .await?;
- 
+
     Ok(())
 }
 
@@ -150,15 +149,15 @@ pub struct RawAttestation {
 }
 
 /// Tries to fetch all attestations from S3.
-/// 
-/// # Errors 
+///
+/// # Errors
 /// - [`GetAttestationError::ListAttestationsError`] - Failed to list attestations.
 /// - [`GetAttestationError::S3GetObjectError`] - Failed to get an object.
 /// - [`GetAttestationError::ParseAddressError`] - Failed to parse an address.
 /// - [`GetAttestationError::ByteStreamError`] - Failed to collect the byte stream.
-/// 
+///
 /// # Panics
-/// 
+///
 /// See [`s3_client`] for more details.
 pub async fn get_raw_attestations() -> Result<Vec<RawAttestation>, GetAttestationError> {
     let s3_client = s3_client().await;
@@ -189,11 +188,7 @@ pub async fn get_raw_attestations() -> Result<Vec<RawAttestation>, GetAttestatio
             .send()
             .await?;
 
-        let bytes = object
-            .body
-            .collect()
-            .await?
-            .to_vec();
+        let bytes = object.body.collect().await?.to_vec();
 
         attestations.push(RawAttestation {
             address: key_as_address,
@@ -204,6 +199,80 @@ pub async fn get_raw_attestations() -> Result<Vec<RawAttestation>, GetAttestatio
     Ok(attestations)
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum AttestationVerificationError {
+    #[error("Failed to verify attestation: {0}")]
+    VerificationError(#[from] AttestError),
+
+    #[error("Failed to verify PCR0 expected: {0} actual: {1}")]
+    Pcr0VerificationError(String, String),
+
+    #[error("Failed to get attestations: {0}")]
+    GetAttestationError(#[from] GetAttestationError),
+
+    #[error("Missing or invalid pubkey field on attestation docment")]
+    MissingPubkey,
+
+    #[error("Invalid associated attestation for signer, expected: {0} found: {1} \n this is a bug.")]
+    AddressMismatch(Address, Address),
+}
+
+/// Verifies an attestation for a given signer and hex-encoded PCR0 value.
+///
+/// # Errors
+/// - [`AttestationVerificationError::GetAttestationError`] - Failed to get the attestation.
+/// - [`AttestationVerificationError::Pcr0VerificationError`] - Failed to verify the PCR0 value.
+/// - [`AttestationVerificationError::VerificationError`] - Failed to verify the attestation.
+pub async fn verify_attestation_for_signer(
+    signer: Address,
+    pcr0: &str,
+) -> Result<(), AttestationVerificationError> {
+    let client = s3_client().await;
+
+    // Fetch the attestation from S3.
+    let attestation = client
+        .get_object()
+        .bucket(crate::S3_BUCKET.to_string())
+        .key(signer.to_string())
+        .send()
+        .await
+        .map_err(GetAttestationError::from)?;
+
+    let bytes = attestation
+        .body
+        .collect()
+        .await
+        .map_err(GetAttestationError::from)?
+        .to_vec();
+
+    // Verify the attestations root of trust.
+    let doc = verify_attestation(bytes.as_ref())?;
+
+    // Verify the PCR0 value.
+    if doc.pcrs[&0] != pcr0.replace("0x", "") {
+        return Err(AttestationVerificationError::Pcr0VerificationError(
+            pcr0.to_string(),
+            hex::encode(doc.pcrs[&0].as_ref()),
+        ));
+    }
+
+    // Verify the address of the attestation.
+    let derived_address = doc
+        .public_key
+        .map(|b| crate::ethereum_address_from_sec1_bytes(b.as_ref()))
+        .flatten()
+        .ok_or(AttestationVerificationError::MissingPubkey)?;
+
+    if derived_address != signer {
+        return Err(AttestationVerificationError::AddressMismatch(
+            signer,
+            derived_address,
+        ));
+    }
+
+    Ok(())
+}
+
 /// Verifies an attestation, this should be the COSESign1 attestation from the enclave.
 ///
 /// This function will:
@@ -211,6 +280,6 @@ pub async fn get_raw_attestations() -> Result<Vec<RawAttestation>, GetAttestatio
 /// - Validate all CA certs against the root of trust
 /// - Verify the signature of the payload
 /// - Return the payload as a deserialized [`AttestationDoc`]
-pub fn verify_attestation(attestation: &[u8]) -> AttestResult<AttestationDoc> { 
+pub fn verify_attestation(attestation: &[u8]) -> AttestResult<AttestationDoc> {
     attestation_doc_validation::validate_and_parse_attestation_doc(attestation)
 }

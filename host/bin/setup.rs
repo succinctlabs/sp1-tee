@@ -320,6 +320,12 @@ fn anvil_deploy_args<P: WalletProvider>(cmd: &mut Command, args: &Args, provider
         "--broadcast",
         "--sender",
         &provider.default_signer_address().to_string(),
+        "--private-key",
+        &args
+            .private_key
+            .as_ref()
+            .clone()
+            .expect("Private key is not set"),
     ]);
 }
 

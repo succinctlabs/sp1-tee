@@ -95,8 +95,8 @@ fn anvil_provider() -> impl Provider {
 }
 
 //
-// Anvil Commands                                                                               anvil pk
-// cargo run --bin sp1-tee-setup -- --deploy --rpc-url=http://127.0.0.1:8545 --private-key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+// Anvil Commands
+// cargo run --bin sp1-tee-setup -- --deploy --anvil
 //
 // cargo run --example fibonacci --features client -- --verifier 0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9
 //

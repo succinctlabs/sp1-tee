@@ -15,7 +15,13 @@ contract SimpleOwnable {
     ///
     /// @dev The owner is the msg.sender.
     constructor(address _owner) {
+        if (_owner == address(0)) {
+            revert("Owner cannot be the zero address");
+        }
+
         owner = _owner;
+
+        emit OwnershipTransferred(address(0), _owner);
     }
 
     /// @notice Only the owner can call the function.
@@ -35,9 +41,11 @@ contract SimpleOwnable {
             revert("New owner cannot be the zero address");
         }
 
+        address previousOwner = owner;
+
         owner = newOwner;
 
-        emit OwnershipTransferred(owner, newOwner);
+        emit OwnershipTransferred(previousOwner, newOwner);
     }
 
     /// @notice Renounces the owner role.

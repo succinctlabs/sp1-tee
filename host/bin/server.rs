@@ -1,9 +1,9 @@
 use axum::{
     body::Bytes,
-    extract::{DefaultBodyLimit, State},
+    extract::{DefaultBodyLimit, State, Query},
     response::sse::{Event, Sse},
     routing::{get, post},
-    Json, Router,
+    Json, Router
 };
 use clap::Parser;
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse};
@@ -40,6 +40,7 @@ async fn main() {
     let app = Router::new()
         .route("/execute", post(execute).layer(DefaultBodyLimit::disable()))
         .route("/address", get(get_address))
+        .route("/signers", get(get_all_signers_for_version))
         .with_state(server);
 
     let listener = TcpListener::bind((args.address.clone(), args.port))
@@ -62,6 +63,44 @@ async fn main() {
             std::process::exit(0);
         }
     }
+}
+
+// todo move to sdk
+#[derive(Debug, serde::Deserialize)]
+struct GetVersionedSignersRequest {
+    pcr0: Option<String>,
+}
+
+async fn get_all_signers_for_version(
+    Query(params): Query<GetVersionedSignersRequest>,
+) -> Result<Bytes, ServerError> {
+    let measurement = if let Some(pcr0) = params.pcr0 {
+        pcr0
+    } else {
+        sp1_tee_host::server::get_enclave_measurement().await?.pcr0
+    };
+
+    let all_attestations = sp1_tee_host::attestations::get_raw_attestations().await?;
+
+    let signers = all_attestations.iter()
+        .filter_map(|raw| {
+            sp1_tee_host::attestations::verify_attestation(&raw.attestation).ok()
+        })
+        .filter(|doc| {
+            doc.pcrs.get(&0).map(|pcr| {
+                hex::encode(pcr.as_ref()) == measurement.replace("0x", "")
+            }).unwrap_or(false)
+        })
+        .map(|doc| {
+            if let Some(public_key) = doc.public_key {
+                sp1_tee_host::ethereum_address_from_sec1_bytes(public_key.as_ref()).ok_or(ServerError::FailedToConvertPublicKeyToAddress)
+            } else {
+                panic!("No public key found in attestation");
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(bincode::serialize(&signers).expect("failed to serialize signers").into())
 }
 
 async fn get_address(

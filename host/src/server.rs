@@ -1,9 +1,10 @@
 #[cfg(feature = "production")]
 use auth::AuthClient;
 
+use axum::{http::StatusCode, response::IntoResponse, response::Response};
 use clap::Parser;
+use serde::Deserialize;
 use std::{path::Path, sync::Arc, time::Duration};
-use axum::{response::IntoResponse, http::StatusCode, response::Response};
 
 pub mod stream;
 
@@ -113,6 +114,15 @@ pub enum ServerError {
     #[error("Failed to deserialize request, {0}")]
     FailedToDeserializeRequest(bincode::Error),
 
+    #[error("Failed to deserialize enclave measurement: {0}")]
+    FailedToParseEnclaveMeasurement(#[from] serde_json::Error),
+
+    #[error("Io Error when fetching enclave measurement: {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("Failed to get attestations: {0}")]
+    FailedToGetAttestations(#[from] crate::attestations::GetAttestationError),
+
     #[cfg(feature = "production")]
     #[error("Failed to authenticate request")]
     FailedToAuthenticateRequest,
@@ -120,19 +130,59 @@ pub enum ServerError {
 
 impl IntoResponse for ServerError {
     fn into_response(self) -> Response {
-        match self {
-            ServerError::FailedToConnectToEnclave => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to connect to enclave").into_response(),
-            ServerError::FailedToSendRequestToEnclave => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to send request to enclave").into_response(),
-            ServerError::FailedToReceiveResponseFromEnclave => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to receive response from enclave").into_response(),
-            ServerError::UnexpectedResponseFromEnclave => (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected response from enclave").into_response(),
-            ServerError::FailedToConvertPublicKeyToAddress => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to convert public key to address, this is a bug.").into_response(),
-            ServerError::EnclaveError(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
-            ServerError::StdinTooLarge(size) => (StatusCode::PAYLOAD_TOO_LARGE, format!("Stdin is too large, found {} bytes", size)).into_response(),
-            ServerError::ProgramTooLarge(size) => (StatusCode::PAYLOAD_TOO_LARGE, format!("Program is too large, found {} bytes", size)).into_response(),
-            ServerError::FailedToDeserializeRequest(e) => (StatusCode::BAD_REQUEST, format!("Failed to deserialize request, {}", e)).into_response(),
+        let err = match self {
+            ServerError::FailedToConnectToEnclave => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to connect to enclave".to_string(),
+            ),
+            ServerError::FailedToSendRequestToEnclave => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to send request to enclave".to_string(),
+            ),
+            ServerError::FailedToReceiveResponseFromEnclave => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to receive response from enclave".to_string(),
+            ),
+            ServerError::UnexpectedResponseFromEnclave => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Unexpected response from enclave".to_string(),
+            ),
+            ServerError::FailedToConvertPublicKeyToAddress => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to convert public key to address, this is a bug.".to_string(),
+            ),
+            ServerError::EnclaveError(e) => (StatusCode::INTERNAL_SERVER_ERROR, e),
+            ServerError::StdinTooLarge(size) => (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                format!("Stdin is too large, found {} bytes", size),
+            ),
+            ServerError::ProgramTooLarge(size) => (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                format!("Program is too large, found {} bytes", size),
+            ),
+            ServerError::FailedToDeserializeRequest(e) => (
+                StatusCode::BAD_REQUEST,
+                format!("Failed to deserialize request, {}", e),
+            ),
+            ServerError::FailedToParseEnclaveMeasurement(e) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to parse enclave measurement, {}", e),
+            ),
+            ServerError::IoError(e) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Io error when fetching enclave measurement, {}", e),
+            ),
+            ServerError::FailedToGetAttestations(e) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to get attestations, {}", e),
+            ),
             #[cfg(feature = "production")]
-            ServerError::FailedToAuthenticateRequest => (StatusCode::UNAUTHORIZED, "Failed to authenticate request").into_response(),
-        }
+            ServerError::FailedToAuthenticateRequest => {
+                (StatusCode::UNAUTHORIZED, "Failed to authenticate request".to_string())
+            }
+        };
+
+        err.into_response()
     }
 }
 
@@ -196,6 +246,40 @@ pub fn terminate_enclaves() {
         tracing::error!("Failed to terminate enclaves");
         std::process::exit(1);
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub struct EnclaveMeasurement {
+    pub pcr0: String,
+    pub pcr1: String,
+    pub pcr2: String,
+}
+
+/// NOTE: Only returns the [`EnclaveMeasurement`] for the first enclave.
+pub async fn get_enclave_measurement() -> Result<EnclaveMeasurement, ServerError> {
+    use std::io;
+
+    #[derive(Debug, Deserialize)]
+    struct Wrapper {
+        #[serde(rename = "Measurements")]
+        measurements: EnclaveMeasurement,
+    }
+
+    let mut command = tokio::process::Command::new("nitro-cli");
+    command.arg("describe-enclaves");
+
+    let output = command.output().await?;
+    let raw =
+        String::from_utf8(output.stdout).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+    let all = serde_json::from_str::<Vec<Wrapper>>(&raw)?;
+
+    Ok(all
+        .into_iter()
+        .next()
+        .ok_or(ServerError::FailedToConnectToEnclave)?
+        .measurements)
 }
 
 /// Spawn a task that will save attestations to S3.

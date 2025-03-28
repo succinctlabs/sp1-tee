@@ -244,7 +244,7 @@ pub enum AttestationVerificationError {
 /// - [`AttestationVerificationError::VerificationError`] - Failed to verify the attestation.
 pub async fn verify_attestation_for_signer(
     signer: Address,
-    version: &str,
+    version: u32,
     pcr0: &str,
 ) -> Result<(), AttestationVerificationError> {
     let client = s3_client_read_only().await;
@@ -284,7 +284,7 @@ pub async fn verify_attestation_for_signer(
         .ok_or(AttestationVerificationError::MissingRequiredField(
             "user_data",
         ))?
-        != version.as_bytes()
+        != &version.to_le_bytes()
     {
         return Err(AttestationVerificationError::VersionMismatch(
             version.to_string(),

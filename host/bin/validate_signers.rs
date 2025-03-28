@@ -21,7 +21,7 @@ enum Command {
         pcr0: String,
         /// The SP1 circuit version to validate the signer against.
         #[clap(long)]
-        version: String,
+        version: u32,
     },
     /// Validate all signers listed on a TEE verifier contract.
     Contract {
@@ -32,7 +32,7 @@ enum Command {
         rpc_url: String,
         /// The SP1 circuit version to validate the signers against.
         #[clap(long)]
-        version: String,
+        version: u32,
         /// The PCR0 value to validate the signers against.
         #[clap(long)]
         pcr0: String,
@@ -45,7 +45,7 @@ async fn main() {
 
     match args.command {
         Command::Signer { signer, version, pcr0 } => {
-            sp1_tee_host::attestations::verify_attestation_for_signer(signer, &version, &pcr0)
+            sp1_tee_host::attestations::verify_attestation_for_signer(signer, version, &pcr0)
                 .await
                 .unwrap();
 
@@ -67,7 +67,7 @@ async fn main() {
             for signer in signers {
                 println!("-----------------------------------");
 
-                match sp1_tee_host::attestations::verify_attestation_for_signer(signer, &version, &pcr0).await {
+                match sp1_tee_host::attestations::verify_attestation_for_signer(signer, version, &pcr0).await {
                     Ok(_) => {
                         println!("Validated signer: {:?}", signer);
                     }

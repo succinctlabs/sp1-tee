@@ -50,7 +50,7 @@ async fn main() {
     let proof = prover
         .prove(&pk, &stdin)
         .plonk()
-        .tee_proof(TEEProof::NitroIntegrity)
+        .tee_2fa_proof(TEEProof::NitroIntegrity)
         .run()
         .unwrap();
 

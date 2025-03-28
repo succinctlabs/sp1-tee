@@ -14,7 +14,6 @@ enum Command {
     /// Validate a single signer.
     Signer {
         /// The signer to validate.
-        #[clap(long)]
         signer: Address,
         /// The PCR0 value to validate the signer against.
         #[clap(long)]

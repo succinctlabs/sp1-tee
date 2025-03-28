@@ -231,7 +231,7 @@ impl Server {
         let public_key_bytes = self.get_public_key().to_bytes().to_vec();
 
         let request = Request::Attestation {
-            user_data: None,
+            user_data: Some(SP1_CIRCUIT_VERSION.as_bytes().to_vec().into()),
             nonce: None,
             public_key: Some(public_key_bytes.into()),
         };

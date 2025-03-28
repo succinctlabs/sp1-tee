@@ -1117,8 +1117,9 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "attestation-doc-validation"
-version = "0.9.0"
-source = "git+https://github.com/nhtyy/attestation-doc-validation?branch=main#b4927119ffdeb3fce2df3ce12ad5150144fef881"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73d09f8ce9c08df11cc4626c2b1ad1c58c52e9470b086622ae3ab7c05cb68500"
 dependencies = [
  "aes",
  "aes-gcm",

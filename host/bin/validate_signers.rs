@@ -1,5 +1,6 @@
 use alloy::primitives::Address;
 use clap::{Parser, Subcommand};
+use sp1_tee_host::attestations::AttestationVerificationError;
 
 #[derive(Parser)]
 struct Args {
@@ -18,6 +19,9 @@ enum Command {
         /// The PCR0 value to validate the signer against.
         #[clap(long)]
         pcr0: String,
+        /// The SP1 circuit version to validate the signer against.
+        #[clap(long)]
+        version: String,
     },
     /// Validate all signers listed on a TEE verifier contract.
     Contract {
@@ -26,6 +30,9 @@ enum Command {
         /// The RPC URL to use to validate the signers.
         #[clap(long)]
         rpc_url: String,
+        /// The SP1 circuit version to validate the signers against.
+        #[clap(long)]
+        version: String,
         /// The PCR0 value to validate the signers against.
         #[clap(long)]
         pcr0: String,
@@ -37,8 +44,8 @@ async fn main() {
     let args = Args::parse();
 
     match args.command {
-        Command::Signer { signer, pcr0 } => {
-            sp1_tee_host::attestations::verify_attestation_for_signer(signer, &pcr0)
+        Command::Signer { signer, version, pcr0 } => {
+            sp1_tee_host::attestations::verify_attestation_for_signer(signer, &version, &pcr0)
                 .await
                 .unwrap();
 
@@ -47,6 +54,7 @@ async fn main() {
         Command::Contract {
             contract,
             pcr0,
+            version,
             rpc_url,
         } => {
             let provider =
@@ -59,11 +67,17 @@ async fn main() {
             for signer in signers {
                 println!("-----------------------------------");
 
-                sp1_tee_host::attestations::verify_attestation_for_signer(signer, &pcr0)
-                    .await
-                    .unwrap();
-
-                println!("Validated signer: {:?}", signer);
+                match sp1_tee_host::attestations::verify_attestation_for_signer(signer, &version, &pcr0).await {
+                    Ok(_) => {
+                        println!("Validated signer: {:?}", signer);
+                    }
+                    Err(AttestationVerificationError::VersionMismatch(_, _)) => {
+                        println!("Signer: {:?}, not for version {}, skipping...", signer, version);
+                    }
+                    Err(e) => {
+                        panic!("Failed to validate signer {}: {:?}", signer, e);
+                    }
+                }
             }
         }
     }

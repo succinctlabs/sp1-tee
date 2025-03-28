@@ -25,7 +25,7 @@ pub const ATTESTATION_INTERVAL: Duration = Duration::from_secs(30 * 60);
 /// # Panics
 ///
 /// This function will panic if the environment variables are not set.
-pub async fn s3_client_write() -> aws_sdk_s3::Client {
+pub(crate) async fn s3_client_write() -> aws_sdk_s3::Client {
     // Loads from environment variables.
     let aws_config = aws_config::defaults(BehaviorVersion::latest())
         // buckets are in us-east-1
@@ -39,7 +39,7 @@ pub async fn s3_client_write() -> aws_sdk_s3::Client {
 }
 
 /// Creates a client that doesnt sign requests
-pub async fn s3_client_read_only() -> aws_sdk_s3::Client {
+pub(crate) async fn s3_client_read_only() -> aws_sdk_s3::Client {
     // Loads from environment variables.
     let aws_config = aws_config::defaults(BehaviorVersion::latest())
         // buckets are in us-east-1
@@ -226,10 +226,15 @@ pub enum AttestationVerificationError {
     GetAttestationError(#[from] GetAttestationError),
 
     #[error("Missing or invalid pubkey field on attestation docment")]
-    MissingPubkey,
+    MissingRequiredField(&'static str),
 
-    #[error("Invalid associated attestation for signer, expected: {0} found: {1} \n this is a bug.")]
+    #[error(
+        "Invalid associated attestation for signer, expected: {0} found: {1} \n this is a bug."
+    )]
     AddressMismatch(Address, Address),
+
+    #[error("Version mismatch, expected: {0} found: {1}")]
+    VersionMismatch(String, String),
 }
 
 /// Verifies an attestation for a given signer and hex-encoded PCR0 value.
@@ -240,6 +245,7 @@ pub enum AttestationVerificationError {
 /// - [`AttestationVerificationError::VerificationError`] - Failed to verify the attestation.
 pub async fn verify_attestation_for_signer(
     signer: Address,
+    version: &str,
     pcr0: &str,
 ) -> Result<(), AttestationVerificationError> {
     let client = s3_client_read_only().await;
@@ -272,12 +278,29 @@ pub async fn verify_attestation_for_signer(
         ));
     }
 
+    // Verify the version of the attestation.
+    if doc
+        .user_data
+        .as_ref()
+        .ok_or(AttestationVerificationError::MissingRequiredField(
+            "user_data",
+        ))?
+        != version.as_bytes()
+    {
+        return Err(AttestationVerificationError::VersionMismatch(
+            version.to_string(),
+            String::from_utf8(doc.user_data.as_ref().unwrap().to_vec()).unwrap(),
+        ));
+    }
+
     // Verify the address of the attestation.
     let derived_address = doc
         .public_key
         .map(|b| crate::ethereum_address_from_sec1_bytes(b.as_ref()))
         .flatten()
-        .ok_or(AttestationVerificationError::MissingPubkey)?;
+        .ok_or(AttestationVerificationError::MissingRequiredField(
+            "public_key",
+        ))?;
 
     if derived_address != signer {
         return Err(AttestationVerificationError::AddressMismatch(
@@ -295,7 +318,10 @@ pub async fn verify_attestation_for_signer(
 /// - Decode the COSESign1 structure.
 /// - Validate all CA certs against the root of trust
 /// - Verify the signature of the payload
-/// - Return the payload as a deserialized [`AttestationDoc`]
+/// - Return the payload as a deserialized [`AttestationDoc`].
+/// 
+/// This function is the "low-level" verification of the root of trust of the attestation.
+/// For protocol level verification, see [`verify_attestation_for_signer`].
 pub fn verify_attestation(attestation: &[u8]) -> AttestResult<AttestationDoc> {
     attestation_doc_validation::validate_and_parse_attestation_doc(attestation)
 }

@@ -63,6 +63,8 @@ pub fn init_tracing() {
 /// Converts a K256 encoded point to an Ethereum address.
 /// 
 /// Ethereum address are derived as `keccack256([x || y])[12..]`
+/// 
+/// Returns `None` if the point is not `uncompressed`.
 #[cfg(feature = "attestations")]
 pub fn ethereum_address_from_encoded_point(encoded_point: &k256::EncodedPoint) -> Option<Address> {
     if encoded_point.is_identity() || encoded_point.is_compact() || encoded_point.is_compressed() {

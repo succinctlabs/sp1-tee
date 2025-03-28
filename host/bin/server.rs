@@ -1,11 +1,12 @@
 use axum::{
     body::Bytes,
-    extract::{DefaultBodyLimit, State, Query},
+    extract::{DefaultBodyLimit, State},
     response::sse::{Event, Sse},
     routing::{get, post},
-    Json, Router
+    Json, Router,
 };
 use clap::Parser;
+use sp1_sdk::SP1_CIRCUIT_VERSION;
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse};
 use sp1_tee_host::{
     api::GetAddressResponse,
@@ -40,7 +41,7 @@ async fn main() {
     let app = Router::new()
         .route("/execute", post(execute).layer(DefaultBodyLimit::disable()))
         .route("/address", get(get_address))
-        .route("/signers", get(get_all_signers_for_version))
+        .route("/signers", get(get_signers))
         .with_state(server);
 
     let listener = TcpListener::bind((args.address.clone(), args.port))
@@ -65,51 +66,38 @@ async fn main() {
     }
 }
 
-// todo move to sdk
-#[derive(Debug, serde::Deserialize)]
-struct GetVersionedSignersRequest {
-    pcr0: Option<String>,
-}
-
 #[tracing::instrument(skip_all)]
-async fn get_all_signers_for_version(
-    Query(params): Query<GetVersionedSignersRequest>,
-) -> Result<Bytes, ServerError> {
+async fn get_signers() -> Result<Bytes, ServerError> {
     tracing::info!("Handling get all signers for version request");
-
-    let measurement = if let Some(pcr0) = params.pcr0 {
-        pcr0
-    } else {
-        sp1_tee_host::server::get_enclave_measurement().await?.pcr0
-    };
-
-    tracing::info!("PCR0: {}", measurement);
 
     let all_attestations = sp1_tee_host::attestations::get_raw_attestations().await?;
 
-    tracing::info!("Found {} attestations", all_attestations.len());
+    tracing::debug!("Found {} attestations", all_attestations.len());
 
-    let signers = all_attestations.iter()
-        .filter_map(|raw| {
-            sp1_tee_host::attestations::verify_attestation(&raw.attestation).ok()
-        })
+    let signers = all_attestations
+        .iter()
+        .filter_map(|raw| sp1_tee_host::attestations::verify_attestation(&raw.attestation).ok())
         .filter(|doc| {
-            doc.pcrs.get(&0).map(|pcr| {
-                hex::encode(pcr.as_ref()) == measurement.replace("0x", "")
-            }).unwrap_or(false)
+            doc.user_data
+                .as_ref()
+                .expect("No user data found in attestation")
+                == SP1_CIRCUIT_VERSION.as_bytes()
         })
         .map(|doc| {
-            if let Some(public_key) = doc.public_key {
-                sp1_tee_host::ethereum_address_from_sec1_bytes(public_key.as_ref()).ok_or(ServerError::FailedToConvertPublicKeyToAddress)
-            } else {
-                panic!("No public key found in attestation");
-            }
+            sp1_tee_host::ethereum_address_from_sec1_bytes(
+                doc.public_key
+                    .as_ref()
+                    .expect("No public key found in attestation"),
+            )
+            .ok_or(ServerError::FailedToConvertPublicKeyToAddress)
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    tracing::info!("Found {} signers", signers.len());
+    tracing::debug!("Found {} signers", signers.len());
 
-    Ok(bincode::serialize(&signers).expect("failed to serialize signers").into())
+    Ok(bincode::serialize(&signers)
+        .expect("failed to serialize signers")
+        .into())
 }
 
 async fn get_address(
@@ -202,8 +190,8 @@ async fn execute(
                     signer
                 );
 
-                return Err(ServerError::FailedToAuthenticateRequest)
-            },
+                return Err(ServerError::FailedToAuthenticateRequest);
+            }
             Err(e) => {
                 tracing::error!(
                     alert = true,
@@ -250,7 +238,7 @@ async fn execute_inner(
     let request = EnclaveRequest::Execute {
         program: request.program,
         stdin: request.stdin,
-        cycle_limit: request.cycle_limit
+        cycle_limit: request.cycle_limit,
     };
 
     // Send the request to the enclave.
@@ -275,7 +263,10 @@ async fn execute_inner(
     })?;
 
     let execution_duration = execution_start.elapsed();
-    tracing::info!("Execution duration: {:?} seconds", execution_duration.as_secs());
+    tracing::info!(
+        "Execution duration: {:?} seconds",
+        execution_duration.as_secs()
+    );
 
     tracing::debug!("Successfully received response from enclave");
 

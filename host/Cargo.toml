@@ -55,7 +55,7 @@ aws-nitro-enclaves-cose = { version = "0.5", optional = true }
 aws-nitro-enclaves-nsm-api = { workspace = true, optional = true }
 aws-config = { version = "=1.5.17", optional = true }
 aws-sdk-s3 = { version = "=1.77.0", optional = true }
-attestation-doc-validation = { git = "https://github.com/nhtyy/attestation-doc-validation", branch = "main", optional = true }
+attestation-doc-validation = { version = "0.10.0", optional = true }
 futures = { version = "0.3.31", optional = true }
 
 # SDK Helpers

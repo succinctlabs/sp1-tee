@@ -8,7 +8,7 @@ use k256::ecdsa::SigningKey;
 use parking_lot::Mutex;
 use rand_core::OsRng;
 use sha3::Digest;
-use sp1_sdk::{CpuProver, HashableKey, Prover, SP1Stdin, SP1_EXECUTOR_VERSION};
+use sp1_sdk::{CpuProver, HashableKey, Prover, SP1Stdin, network::tee::SP1_TEE_VERSION};
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse, VsockStream};
 use std::sync::Arc;
 use tokio_vsock::{VsockAddr, VsockListener, VsockStream as VsockStreamRaw, VMADDR_CID_ANY};
@@ -230,7 +230,7 @@ impl Server {
         let public_key_bytes = self.get_public_key().to_bytes().to_vec();
 
         let request = Request::Attestation {
-            user_data: Some(SP1_EXECUTOR_VERSION.as_bytes().to_vec().into()),
+            user_data: Some(SP1_TEE_VERSION.to_le_bytes().to_vec().into()),
             nonce: None,
             public_key: Some(public_key_bytes.into()),
         };
@@ -275,7 +275,7 @@ impl Server {
                 let vkey_raw = vk.bytes32_raw();
                 
                 // Hash the version bytes.
-                let version_bytes = SP1_EXECUTOR_VERSION.as_bytes().to_vec();
+                let version_bytes = SP1_TEE_VERSION.to_le_bytes().to_vec();
                 let version_bytes_hash = sha3::Keccak256::new_with_prefix(version_bytes.as_slice()).finalize();
                 
                 let to_sign = [version_bytes_hash.to_vec(), vkey_raw.to_vec(), public_values_hash.to_vec()].concat();

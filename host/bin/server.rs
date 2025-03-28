@@ -6,7 +6,7 @@ use axum::{
     Json, Router,
 };
 use clap::Parser;
-use sp1_sdk::SP1_EXECUTOR_VERSION;
+use sp1_sdk::network::tee::SP1_TEE_VERSION;
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse};
 use sp1_tee_host::{
     api::GetAddressResponse,
@@ -81,7 +81,7 @@ async fn get_signers() -> Result<Bytes, ServerError> {
             doc.user_data
                 .as_ref()
                 .expect("No user data found in attestation")
-                == SP1_EXECUTOR_VERSION.as_bytes()
+                == &SP1_TEE_VERSION.to_le_bytes()
         })
         .map(|doc| {
             sp1_tee_host::ethereum_address_from_sec1_bytes(

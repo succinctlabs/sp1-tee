@@ -30,7 +30,6 @@ pub(crate) async fn s3_client_write() -> aws_sdk_s3::Client {
     let aws_config = aws_config::defaults(BehaviorVersion::latest())
         // buckets are in us-east-1
         .region(Region::new("us-east-1"))
-        .no_credentials()
         .load()
         .await;
 

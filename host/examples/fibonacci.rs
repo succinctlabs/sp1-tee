@@ -36,7 +36,7 @@ async fn main() {
     let mut stdin = SP1Stdin::new();
     stdin.write(&args.count);
 
-    let signers = sp1_sdk::network::tee::get_tee_signers(None).await.unwrap();
+    let signers = sp1_sdk::network::tee::get_tee_signers().await.unwrap();
     println!("Signers: {:?}", signers);
 
     let network_pk = std::env::var("NETWORK_PK").unwrap();

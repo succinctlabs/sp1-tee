@@ -25,11 +25,26 @@ pub const ATTESTATION_INTERVAL: Duration = Duration::from_secs(30 * 60);
 /// # Panics
 ///
 /// This function will panic if the environment variables are not set.
-pub async fn s3_client() -> aws_sdk_s3::Client {
+pub async fn s3_client_write() -> aws_sdk_s3::Client {
     // Loads from environment variables.
     let aws_config = aws_config::defaults(BehaviorVersion::latest())
         // buckets are in us-east-1
         .region(Region::new("us-east-1"))
+        .no_credentials()
+        .load()
+        .await;
+
+    // Create the S3 client.
+    aws_sdk_s3::Client::new(&aws_config)
+}
+
+/// Creates a client that doesnt sign requests
+pub async fn s3_client_read_only() -> aws_sdk_s3::Client {
+    // Loads from environment variables.
+    let aws_config = aws_config::defaults(BehaviorVersion::latest())
+        // buckets are in us-east-1
+        .region(Region::new("us-east-1"))
+        .no_credentials()
         .load()
         .await;
 
@@ -82,7 +97,7 @@ pub async fn save_attestation(args: SaveAttestationArgs) -> Result<(), SaveAttes
 
     let SaveAttestationArgs { cid, port, bucket } = args;
 
-    let s3_client = s3_client().await;
+    let s3_client = s3_client_write().await;
 
     // Connect to the enclave.
     let mut stream = HostStream::new(cid, port).await?;
@@ -160,7 +175,7 @@ pub struct RawAttestation {
 ///
 /// See [`s3_client`] for more details.
 pub async fn get_raw_attestations() -> Result<Vec<RawAttestation>, GetAttestationError> {
-    let s3_client = s3_client().await;
+    let s3_client = s3_client_read_only().await;
 
     let attestation_s3_objs = s3_client
         .list_objects_v2()
@@ -227,7 +242,7 @@ pub async fn verify_attestation_for_signer(
     signer: Address,
     pcr0: &str,
 ) -> Result<(), AttestationVerificationError> {
-    let client = s3_client().await;
+    let client = s3_client_read_only().await;
 
     // Fetch the attestation from S3.
     let attestation = client
@@ -249,10 +264,11 @@ pub async fn verify_attestation_for_signer(
     let doc = verify_attestation(bytes.as_ref())?;
 
     // Verify the PCR0 value.
-    if doc.pcrs[&0] != pcr0.replace("0x", "") {
+    let doc_pcr0 = hex::encode(doc.pcrs[&0].as_ref());
+    if doc_pcr0 != pcr0.replace("0x", "") {
         return Err(AttestationVerificationError::Pcr0VerificationError(
             pcr0.to_string(),
-            hex::encode(doc.pcrs[&0].as_ref()),
+            doc_pcr0,
         ));
     }
 

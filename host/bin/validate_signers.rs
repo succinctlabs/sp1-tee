@@ -43,6 +43,8 @@ async fn main() {
             sp1_tee_host::attestations::verify_attestation_for_signer(signer, &pcr0)
                 .await
                 .unwrap();
+
+            println!("Validated signer: {:?}", signer);
         }
         Command::Contract {
             contract,
@@ -57,9 +59,13 @@ async fn main() {
             let signers = instance.getSigners().call().await.unwrap()._0;
 
             for signer in signers {
+                println!("-----------------------------------");
+
                 sp1_tee_host::attestations::verify_attestation_for_signer(signer, &pcr0)
                     .await
                     .unwrap();
+
+                println!("Validated signer: {:?}", signer);
             }
         }
         Command::All { pcr0 } => {
@@ -73,6 +79,8 @@ async fn main() {
                 attestation,
             } in attestations
             {
+                println!("-----------------------------------");
+
                 // Verify the attestation.
                 let doc = match sp1_tee_host::attestations::verify_attestation(&attestation) {
                     Ok(doc) => doc,
@@ -88,11 +96,13 @@ async fn main() {
                 };
 
                 // Verify the PCR0 value.
-                if doc.pcrs[&0] != pcr0.replace("0x", "") {
-                    panic!(
+                let doc_pcr0 = hex::encode(doc.pcrs[&0].as_ref());
+                if doc_pcr0 != pcr0.replace("0x", "") {
+                    eprintln!(
                         "PCR0 mismatch for address: {}, expected: {:?}, got: {:?}",
-                        address, pcr0, doc.pcrs[&0]
+                        address, pcr0, doc_pcr0
                     );
+                    continue;
                 }
 
                 // Derive the address from the public key.
@@ -109,6 +119,8 @@ async fn main() {
                         address, derived_address
                     );
                 }
+
+                println!("Validated signer: {:?}", address);
             }
         }
     }

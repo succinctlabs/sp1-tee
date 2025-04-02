@@ -70,6 +70,7 @@ async fn main() {
                     Ok(_) => {
                         println!("Validated signer: {:?}", signer);
                     }
+                    // It is expected that some signers will not be for the given version.
                     Err(AttestationVerificationError::VersionMismatch(_, _)) => {
                         println!("Signer: {:?}, not for version {}, skipping...", signer, version);
                     }

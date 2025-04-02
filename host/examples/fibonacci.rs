@@ -1,10 +1,16 @@
+//!
+//! Anvil Commands
+//! cargo run --bin sp1-tee-setup -- --deploy --anvil
+//!
+//! cargo run --example fibonacci --features client -- --verifier 0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9
+//!
+
 use alloy::network::EthereumWallet;
 use alloy::primitives::Address;
 use alloy::providers::Provider;
 use alloy::providers::ProviderBuilder;
 use alloy::signers::local::PrivateKeySigner;
 use clap::Parser;
-use sp1_sdk::network::tee::TEEProof;
 use sp1_sdk::HashableKey;
 use sp1_sdk::Prover;
 use sp1_sdk::SP1Stdin;
@@ -36,25 +42,23 @@ async fn main() {
     let mut stdin = SP1Stdin::new();
     stdin.write(&args.count);
 
-    let signers = sp1_sdk::network::tee::get_tee_signers().await.unwrap();
-    println!("Signers: {:?}", signers);
-
+    // Initialize the prover.
     let network_pk = std::env::var("NETWORK_PK").unwrap();
     let prover = sp1_sdk::ProverClient::builder()
         .network()
-        .tee_signers(&signers)
         .private_key(&network_pk)
         .build();
 
+    // Setup the program to prove.
     let (pk, vk) = prover.setup(program);
     let proof = prover
         .prove(&pk, &stdin)
         .plonk()
-        .tee_2fa_proof(TEEProof::NitroIntegrity)
+        .tee_2fa()
         .run()
         .unwrap();
 
-    // Verify the proof with the rust verifier
+    // Verify the proof with the rust verifier.
     prover.verify(&proof, &vk).unwrap();
     println!("Proof verified with rust verifier");
 
@@ -101,10 +105,3 @@ fn anvil_provider() -> impl Provider {
 
     provider
 }
-
-//
-// Anvil Commands
-// cargo run --bin sp1-tee-setup -- --deploy --anvil
-//
-// cargo run --example fibonacci --features client -- --verifier 0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9
-//

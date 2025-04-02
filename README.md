@@ -20,6 +20,7 @@ By default the enclave withholds 9GB and 12vCPU, this mean you'll need a host ma
 After ensuring that your EC2 instance meets these requirments, you must also enable the `Nitro Enclaves` setting in the Instance `Advanced Settings`. SSH into your machine and run the following command:
 
 `sudo dnf install make`
+
 `make install`
 
 This will:

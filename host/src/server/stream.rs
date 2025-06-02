@@ -12,23 +12,36 @@ impl HostStream {
     pub async fn new(cid: u32, port: u16) -> Result<Self, CommunicationError> {
         let stream = VsockStream::connect(cid, port as u32).await?;
 
-        Ok(Self { stream: Some(stream) })
+        Ok(Self {
+            stream: Some(stream),
+        })
     }
 
     /// Sends a request to the enclave.
     pub async fn send(&mut self, request: EnclaveRequest) -> Result<(), CommunicationError> {
-        self.stream.as_mut().expect("Stream should be initialized, this is a bug").send(request).await
+        self.stream
+            .as_mut()
+            .expect("Stream should be initialized, this is a bug")
+            .send(request)
+            .await
     }
 
     /// Receives a response from the enclave.
     pub async fn recv(&mut self) -> Result<EnclaveResponse, CommunicationError> {
-        self.stream.as_mut().expect("Stream should be initialized, this is a bug").recv().await
+        self.stream
+            .as_mut()
+            .expect("Stream should be initialized, this is a bug")
+            .recv()
+            .await
     }
 }
 
 impl Drop for HostStream {
     fn drop(&mut self) {
-        let mut stream = self.stream.take().expect("Stream should be initialized, this is a bug");
+        let mut stream = self
+            .stream
+            .take()
+            .expect("Stream should be initialized, this is a bug");
 
         tokio::task::spawn(async move {
             if let Err(e) = stream.send(EnclaveRequest::CloseSession).await {

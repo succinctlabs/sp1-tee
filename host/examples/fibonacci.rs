@@ -51,12 +51,7 @@ async fn main() {
 
     // Setup the program to prove.
     let (pk, vk) = prover.setup(program);
-    let proof = prover
-        .prove(&pk, &stdin)
-        .plonk()
-        .tee_2fa()
-        .run()
-        .unwrap();
+    let proof = prover.prove(&pk, &stdin).plonk().tee_2fa().run().unwrap();
 
     // Verify the proof with the rust verifier.
     prover.verify(&proof, &vk).unwrap();
@@ -65,7 +60,10 @@ async fn main() {
     if let Some(verifier) = args.verifier {
         let provider = anvil_provider();
 
-        let _ = provider.get_chain_id().await.expect("Failed to fetch chain id on default anvil ports, make sure anvil is running");
+        let _ = provider
+            .get_chain_id()
+            .await
+            .expect("Failed to fetch chain id on default anvil ports, make sure anvil is running");
 
         let verifier = SP1Gateway::new(verifier, provider);
 
@@ -95,8 +93,8 @@ async fn main() {
 
 fn anvil_provider() -> impl Provider {
     let anvil_pk = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-            .parse::<PrivateKeySigner>()
-            .unwrap();
+        .parse::<PrivateKeySigner>()
+        .unwrap();
 
     let wallet = EthereumWallet::new(anvil_pk);
     let provider = ProviderBuilder::new()

@@ -74,6 +74,7 @@ impl Default for SaveAttestationArgs {
 }
 
 #[derive(Debug, thiserror::Error)]
+#[allow(clippy::large_enum_variant)]
 pub enum SaveAttestationError {
     #[error("Failed to communicate with enclave: {0:?}")]
     VsockError(#[from] CommunicationError),
@@ -214,6 +215,7 @@ pub async fn get_raw_attestations() -> Result<Vec<RawAttestation>, GetAttestatio
 }
 
 #[derive(Debug, thiserror::Error)]
+#[allow(clippy::large_enum_variant)]
 pub enum AttestationVerificationError {
     #[error("Failed to verify attestation: {0}")]
     VerificationError(#[from] AttestError),
@@ -295,8 +297,7 @@ pub async fn verify_attestation_for_signer(
     // Verify the address of the attestation.
     let derived_address = doc
         .public_key
-        .map(|b| crate::ethereum_address_from_sec1_bytes(b.as_ref()))
-        .flatten()
+        .and_then(|b| crate::ethereum_address_from_sec1_bytes(b.as_ref()))
         .ok_or(AttestationVerificationError::MissingRequiredField(
             "public_key",
         ))?;
@@ -318,7 +319,7 @@ pub async fn verify_attestation_for_signer(
 /// - Validate all CA certs against the root of trust
 /// - Verify the signature of the payload
 /// - Return the payload as a deserialized [`AttestationDoc`].
-/// 
+///
 /// This function is the "low-level" verification of the root of trust of the attestation.
 /// For protocol level verification, see [`verify_attestation_for_signer`].
 pub fn verify_attestation(attestation: &[u8]) -> AttestResult<AttestationDoc> {

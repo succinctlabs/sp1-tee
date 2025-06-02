@@ -1,4 +1,4 @@
-pub use sp1_sdk::network::tee::api::{TEEResponse, TEERequest, GetAddressResponse, EventPayload};
+pub use sp1_sdk::network::tee::api::{EventPayload, GetAddressResponse, TEERequest, TEEResponse};
 
 #[cfg(feature = "server")]
 use {crate::server::ServerError, axum::response::sse::Event};

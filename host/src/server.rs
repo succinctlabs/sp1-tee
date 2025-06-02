@@ -49,6 +49,7 @@ impl Server {
         start_enclave(args);
 
         // Spawn a task to save attestations to S3.
+        #[cfg(feature = "production")]
         spawn_attestation_task(
             args.enclave_cid,
             sp1_tee_common::ENCLAVE_PORT,
@@ -57,6 +58,8 @@ impl Server {
 
         // Spawn a thread to collect metrics.
         spawn_metrics_thread(args.metrics_port);
+
+        HostMetrics::RunningEnclaveGauge.increment();
 
         Arc::new(Self {
             execution_mutex: tokio::sync::Mutex::new(()),

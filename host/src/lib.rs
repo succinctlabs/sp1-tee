@@ -34,6 +34,8 @@ pub const S3_BUCKET: &str = "sp1-tee-attestations";
 #[cfg(not(feature = "production"))]
 pub const S3_BUCKET: &str = "sp1-tee-attestations-testing";
 
+pub mod metrics;
+
 /// Initialize the tracing subscriber.
 ///
 /// The default filter is `sp1-tee-server=debug,info`.

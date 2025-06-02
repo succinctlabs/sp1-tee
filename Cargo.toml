@@ -22,6 +22,10 @@ clap = { version = "4.5.30", features = ["derive"] }
 k256 = { version = "0.13.4", features = ["serde"] }
 aws-nitro-enclaves-nsm-api = "0.4.0"
 tracing = "0.1.41"
+metrics = "0.24.2"
+metrics-exporter-prometheus = "0.16.2"
+metrics-process = "2.4.0"
+strum = "0.27.1"
 
 # Alerts
 alert-subscriber = { git = "https://github.com/succinctlabs/alert-subscriber.git", branch = "main" }

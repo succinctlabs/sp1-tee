@@ -3,8 +3,18 @@ use auth::AuthClient;
 
 use axum::{http::StatusCode, response::IntoResponse, response::Response};
 use clap::Parser;
+use metrics_exporter_prometheus::PrometheusBuilder;
+use metrics_process::Collector;
 use serde::Deserialize;
-use std::{path::Path, sync::Arc, time::Duration};
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    path::Path,
+    sync::Arc,
+    thread,
+    time::Duration,
+};
+
+use crate::metrics::HostMetrics;
 
 pub mod stream;
 
@@ -45,6 +55,9 @@ impl Server {
             crate::attestations::ATTESTATION_INTERVAL,
         );
 
+        // Spawn a thread to collect metrics.
+        spawn_metrics_thread(args.metrics_port);
+
         Arc::new(Self {
             execution_mutex: tokio::sync::Mutex::new(()),
             cid: args.enclave_cid,
@@ -83,6 +96,10 @@ pub struct ServerArgs {
     /// The RPC URL of the prover network.
     #[clap(long, default_value = "https://rpc.production.succinct.xyz/")]
     pub prover_network_url: String,
+
+    /// The metrics port.
+    #[clap(short, long, default_value = "9000")]
+    pub metrics_port: u16,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -312,6 +329,32 @@ pub fn spawn_attestation_task(cid: u32, port: u16, interval: Duration) {
             }
 
             interval.tick().await;
+        }
+    });
+}
+
+pub fn spawn_metrics_thread(port: u16) {
+    HostMetrics::register();
+
+    let builder = PrometheusBuilder::new().with_http_listener(SocketAddr::new(
+        IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+        port.to_owned(),
+    ));
+
+    if let Err(e) = builder.install() {
+        tracing::warn!(
+            "Failed to start metrics server: {}. Will continue without metrics.",
+            e
+        );
+    }
+
+    thread::spawn(move || {
+        let collector = Collector::default();
+        collector.describe();
+        loop {
+            // Periodically call `collect()` method to update informations.
+            collector.collect();
+            thread::sleep(Duration::from_millis(750));
         }
     });
 }

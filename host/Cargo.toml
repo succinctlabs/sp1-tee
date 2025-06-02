@@ -39,6 +39,10 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 alert-subscriber = { workspace = true }
 hex = "0.4.3"
 axum = { version = "0.8.1", optional = true }
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+metrics-process = { workspace = true }
+strum = { workspace = true }
 
 # Attestation Helpers
 aws-nitro-enclaves-cose = { version = "0.5", optional = true }

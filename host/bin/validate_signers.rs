@@ -35,7 +35,7 @@ enum Command {
         /// The PCR0 value to validate the signers against.
         #[clap(long)]
         pcr0: String,
-    }
+    },
 }
 
 #[tokio::main]
@@ -43,7 +43,11 @@ async fn main() {
     let args = Args::parse();
 
     match args.command {
-        Command::Signer { signer, version, pcr0 } => {
+        Command::Signer {
+            signer,
+            version,
+            pcr0,
+        } => {
             sp1_tee_host::attestations::verify_attestation_for_signer(signer, version, &pcr0)
                 .await
                 .unwrap();
@@ -57,22 +61,29 @@ async fn main() {
             rpc_url,
         } => {
             let provider =
-                alloy::providers::ProviderBuilder::new().on_http(rpc_url.parse().unwrap());
+                alloy::providers::ProviderBuilder::new().connect_http(rpc_url.parse().unwrap());
 
             let instance = sp1_tee_host::contract::TEEVerifier::new(contract, provider);
 
-            let signers = instance.getSigners().call().await.unwrap()._0;
+            let signers = instance.getSigners().call().await.unwrap();
 
             for signer in signers {
                 println!("-----------------------------------");
 
-                match sp1_tee_host::attestations::verify_attestation_for_signer(signer, version, &pcr0).await {
+                match sp1_tee_host::attestations::verify_attestation_for_signer(
+                    signer, version, &pcr0,
+                )
+                .await
+                {
                     Ok(_) => {
                         println!("Validated signer: {:?}", signer);
                     }
                     // It is expected that some signers will not be for the given version.
                     Err(AttestationVerificationError::VersionMismatch(_, _)) => {
-                        println!("Signer: {:?}, not for version {}, skipping...", signer, version);
+                        println!(
+                            "Signer: {:?}, not for version {}, skipping...",
+                            signer, version
+                        );
                     }
                     Err(e) => {
                         panic!("Failed to validate signer {}: {:?}", signer, e);

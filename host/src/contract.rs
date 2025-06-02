@@ -16,8 +16,8 @@ mod bindings {
             function verifyProof(bytes32 vk, bytes public_input, bytes memory proof) external view returns (bool);
         }
     }
-    
-    pub type TEEVerifier<P, N> = _TEEVerifier::_TEEVerifierInstance<(), P, N>;
+
+    pub type TEEVerifier<P, N> = _TEEVerifier::_TEEVerifierInstance<P, N>;
 }
 
 pub use bindings::TEEVerifier;

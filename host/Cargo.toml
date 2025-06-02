@@ -29,6 +29,7 @@ tokio-vsock = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 
 clap = { workspace = true }
+dotenv = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 k256 = { workspace = true }

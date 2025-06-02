@@ -6,6 +6,7 @@ use axum::{
     Json, Router,
 };
 use clap::Parser;
+use dotenv::dotenv;
 use sp1_sdk::network::tee::SP1_TEE_VERSION;
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse};
 use sp1_tee_host::{
@@ -25,6 +26,7 @@ use futures::stream::{self, Stream, StreamExt};
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
     sp1_tee_host::init_tracing();
 
     let args = ServerArgs::parse();

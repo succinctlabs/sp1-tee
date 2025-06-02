@@ -1,12 +1,3 @@
-# TEMP: CANNOT USE PRIVATE REPOS IN DOCKER BUILDS
-git clone https://github.com/succinctlabs/sp1-wip.git
-
-pushd sp1-wip
-git checkout n/tee-proofs
-popd
-
-# END TEMP
-
 # Install the Nitro Enclaves CLI.
 sudo dnf install aws-nitro-enclaves-cli aws-nitro-enclaves-cli-devel openssl-devel gcc cmake3 gcc-c++ -y
 

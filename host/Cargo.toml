@@ -9,19 +9,9 @@ path = "bin/server.rs"
 required-features = ["server"]
 
 [[bin]]
-name = "vsock_test"
-path = "bin/vsock_test.rs"
-required-features = ["server"]
-
-[[bin]]
 name = "sp1-tee-setup"
 path = "bin/setup.rs"
 required-features = ["server"]
-
-[[bin]]
-name = "save_attestation"
-path = "bin/save_attestation.rs"
-required-features = ["attestations"]
 
 [[bin]]
 name = "validate_signers"
@@ -43,7 +33,7 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 k256 = { workspace = true }
 
-alloy = { version = "0.11.1", features = ["full"] }
+alloy = { version = "1.0", features = ["full"] }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 alert-subscriber = { workspace = true }

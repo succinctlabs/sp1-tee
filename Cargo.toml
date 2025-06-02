@@ -1,6 +1,5 @@
 [workspace]
 members = ["host", "enclave", "common"]
-exclude = ["sp1-wip"]
 resolver = "2"
 
 [workspace.package]
@@ -27,7 +26,5 @@ tracing = "0.1.41"
 # Alerts
 alert-subscriber = { git = "https://github.com/succinctlabs/alert-subscriber.git", branch = "main" }
 
-# TEMP: Use local sp1-wip repo for now.
-# TODO: Change this to public when merged.
-sp1-sdk = { path = "sp1-wip/crates/sdk" }
-sp1-prover = { path = "sp1-wip/crates/prover" }
+sp1-sdk = { version = "5.0.0" }
+sp1-prover = { version = "5.0.0" }

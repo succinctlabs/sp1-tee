@@ -349,7 +349,7 @@ pub fn spawn_metrics_thread(port: u16) {
     }
 
     thread::spawn(move || {
-        let collector = Collector::default();
+        let collector = Collector::new("sp1_tee_");
         collector.describe();
         loop {
             // Periodically call `collect()` method to update informations.

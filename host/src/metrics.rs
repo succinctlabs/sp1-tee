@@ -3,11 +3,20 @@ use strum::{Display, EnumIter, EnumMessage, IntoEnumIterator};
 
 #[derive(Debug, Display, EnumIter, EnumMessage)]
 pub enum HostMetrics {
-    #[strum(serialize = "sp1_tee_executions", message = "")]
+    #[strum(
+        serialize = "sp1_tee_executions",
+        message = "Total number of executions"
+    )]
     TeeExecutionCounter,
-    #[strum(serialize = "sp1_tee_running_enclaves")]
+    #[strum(
+        serialize = "sp1_tee_running_enclaves",
+        message = "Total number of running enclaves"
+    )]
     RunningEnclaveGauge,
-    #[strum(serialize = "sp1_tee_execution_errors")]
+    #[strum(
+        serialize = "sp1_tee_execution_errors",
+        message = "Total number of execution errors"
+    )]
     TeeExecutionErrorCounter,
 }
 

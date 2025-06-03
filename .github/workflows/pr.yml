@@ -1,0 +1,96 @@
+name: CI
+
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  fmt:
+    name: "Check code format"
+    runs-on: ["runs-on", "runner=8cpu-linux-x64", "run-id=${{ github.run_id }}"]
+    steps:
+      - name: "Checkout sources"
+        uses: "actions/checkout@v4"
+
+      - name: "Setup nightly toolchain"
+        uses: "actions-rs/toolchain@v1"
+        with:
+          toolchain: "nightly"
+          profile: "minimal"
+          components: "rustfmt"
+          override: true
+
+      - name: "Check Rust format"
+        run: |
+          cargo fmt --all -- --check
+
+  clippy:
+    name: "Run clippy lints"
+    runs-on: ["runs-on", "runner=8cpu-linux-x64", "run-id=${{ github.run_id }}"]
+    steps:
+      - name: "Checkout sources"
+        uses: "actions/checkout@v4"
+
+      - name: "Install sp1up"
+        run: |
+          curl -L https://sp1.succinct.xyz | bash
+          echo "$HOME/.sp1/bin" >> $GITHUB_PATH
+
+      - name: "Install SP1 toolchain"
+        run: |
+          sp1up
+
+      # This step is necessary to generate the ELF files.
+      - name: "Build"
+        run: |
+          cargo build --all --all-targets
+
+      - name: "Run clippy lints"
+        run: |
+          cargo clippy --all --all-targets -- -D warnings
+  
+  check-contracts:
+    strategy:
+      fail-fast: true
+
+    name: Foundry project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Show Forge version
+        run: |
+          forge --version
+
+      - name: Run Forge fmt
+        run: |
+          forge fmt --check --root contracts
+        id: fmt
+
+      - name: Ensure libs are installed
+        working-directory: contracts
+        run: |
+          forge install
+
+      - name: Run Forge build
+        working-directory: contracts
+        run: |
+          forge build --sizes
+        id: build
+
+      - name: Run Forge tests
+        working-directory: contracts
+        run: |
+          forge test -vvv
+        id: test

@@ -57,7 +57,7 @@ impl Server {
         );
 
         // Spawn a thread to collect metrics.
-        spawn_metrics_thread(args.metrics_port);
+        spawn_metrics_thread(args.metrics_port, args.metrics_prefix.clone());
 
         HostMetrics::RunningEnclaveGauge.increment();
 
@@ -101,8 +101,12 @@ pub struct ServerArgs {
     pub prover_network_url: String,
 
     /// The metrics port.
-    #[clap(short, long, default_value = "9000")]
+    #[clap(long, default_value = "9000")]
     pub metrics_port: u16,
+
+    /// The metrics labels prefix.
+    #[clap(long)]
+    pub metrics_prefix: Option<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -336,7 +340,7 @@ pub fn spawn_attestation_task(cid: u32, port: u16, interval: Duration) {
     });
 }
 
-pub fn spawn_metrics_thread(port: u16) {
+pub fn spawn_metrics_thread(port: u16, prefix: Option<String>) {
     HostMetrics::register();
 
     let builder = PrometheusBuilder::new().with_http_listener(SocketAddr::new(
@@ -351,8 +355,12 @@ pub fn spawn_metrics_thread(port: u16) {
         );
     }
 
+    let prefix = prefix
+        .map(|p| format!("sp1_tee_{p}_"))
+        .unwrap_or_else(|| "sp1_tee_".to_string());
+
     thread::spawn(move || {
-        let collector = Collector::new("sp1_tee_");
+        let collector = Collector::new(prefix);
         collector.describe();
         loop {
             // Periodically call `collect()` method to update informations.

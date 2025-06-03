@@ -2,7 +2,9 @@ fn main() {
     // Nitro Enclaves are only supported on linux, so dont bother building if we are on macos.
     #[cfg(not(target_os = "macos"))]
     {
-        let dst = cmake::Config::new("aws-nitro-enclaves-sdk-c").cflag("-Wno-error=maybe-uninitialized").build();
+        let dst = cmake::Config::new("aws-nitro-enclaves-sdk-c")
+            .cflag("-Wno-error=maybe-uninitialized")
+            .build();
         println!("cargo:rustc-link-search=native={}/lib64", dst.display());
         
         // The top level lib.

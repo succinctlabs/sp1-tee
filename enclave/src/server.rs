@@ -8,7 +8,7 @@ use k256::ecdsa::SigningKey;
 use parking_lot::Mutex;
 use rand_core::OsRng;
 use sha3::Digest;
-use sp1_sdk::{CpuProver, HashableKey, Prover, SP1Stdin, network::tee::SP1_TEE_VERSION};
+use sp1_sdk::{network::tee::SP1_TEE_VERSION, CpuProver, HashableKey, Prover, SP1Stdin};
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse, VsockStream};
 use std::sync::Arc;
 use tokio_vsock::{VsockAddr, VsockListener, VsockStream as VsockStreamRaw, VMADDR_CID_ANY};
@@ -135,7 +135,7 @@ impl Server {
             EnclaveRequest::Print(_) => {
                 // Outside of debug mode the console cannot be accessed.
 
-                let _ = stream.send(EnclaveResponse::Ack);
+                stream.send(EnclaveResponse::Ack).await.unwrap();
             }
             EnclaveRequest::GetPublicKey => {
                 let public_key = self.get_public_key();
@@ -161,8 +161,14 @@ impl Server {
                     }
                 }
             }
-            EnclaveRequest::Execute { stdin, program, cycle_limit } => {
-                match tokio::task::spawn_blocking(move || self.execute(stdin, program, cycle_limit)).await {
+            EnclaveRequest::Execute {
+                stdin,
+                program,
+                cycle_limit,
+            } => {
+                match tokio::task::spawn_blocking(move || self.execute(stdin, program, cycle_limit))
+                    .await
+                {
                     Ok(response) => {
                         stream.send(response).await.unwrap();
                     }
@@ -254,7 +260,10 @@ impl Server {
     /// Sends a signature over the public values (and the vkey) to the host.
     fn execute(&self, stdin: SP1Stdin, program: Vec<u8>, cycle_limit: u64) -> EnclaveResponse {
         if cycle_limit > MAX_ALLOWED_CYCLES {
-            return EnclaveResponse::Error(format!("Cycle limit is too high: {}, max: {}", cycle_limit, MAX_ALLOWED_CYCLES));
+            return EnclaveResponse::Error(format!(
+                "Cycle limit is too high: {}, max: {}",
+                cycle_limit, MAX_ALLOWED_CYCLES
+            ));
         }
 
         // Take the guard to ensure only one execution can be running at a time.
@@ -265,20 +274,32 @@ impl Server {
         debug_print!("Setup complete");
 
         // Defaults `true` for deferred proof verification.
-        match self.prover.execute(&program, &stdin).cycle_limit(cycle_limit).run() {
+        match self
+            .prover
+            .execute(&program, &stdin)
+            .cycle_limit(cycle_limit)
+            .run()
+        {
             Ok((public_values, _)) => {
                 debug_print!("Execute complete");
 
                 // Hash the public values.
-                let public_values_hash = sha3::Keccak256::new_with_prefix(public_values.as_slice()).finalize();
+                let public_values_hash =
+                    sha3::Keccak256::new_with_prefix(public_values.as_slice()).finalize();
 
                 let vkey_raw = vk.bytes32_raw();
-                
+
                 // Hash the version bytes.
                 let version_bytes = SP1_TEE_VERSION.to_le_bytes().to_vec();
-                let version_bytes_hash = sha3::Keccak256::new_with_prefix(version_bytes.as_slice()).finalize();
-                
-                let to_sign = [version_bytes_hash.to_vec(), vkey_raw.to_vec(), public_values_hash.to_vec()].concat();
+                let version_bytes_hash =
+                    sha3::Keccak256::new_with_prefix(version_bytes.as_slice()).finalize();
+
+                let to_sign = [
+                    version_bytes_hash.to_vec(),
+                    vkey_raw.to_vec(),
+                    public_values_hash.to_vec(),
+                ]
+                .concat();
 
                 let hasher = sha3::Keccak256::new_with_prefix(to_sign.as_slice());
 

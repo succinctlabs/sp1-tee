@@ -1,13 +1,13 @@
 mod bytebuf;
 use bytebuf::AWSByteBuf;
 
-mod string; 
+mod string;
 
 #[repr(C)]
 pub struct AWSAllocator {
     #[doc(hidden)]
     /// The internals of this type are not important.
-    /// 
+    ///
     /// The enclave merely needs to hold a pointer to this type.
     _unused: [u8; 0],
 }

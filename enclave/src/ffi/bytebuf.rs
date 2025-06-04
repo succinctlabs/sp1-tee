@@ -1,11 +1,11 @@
-use super::{AWSAllocator, aws_byte_buf_clean_up};
+use super::{aws_byte_buf_clean_up, AWSAllocator};
 
 use std::alloc::Layout;
 
 /// A buffer of bytes.
-/// 
+///
 /// This type is a direct mapping of the `aws_byte_buf` type in the AWS C Common library.
-/// 
+///
 /// <https://github.com/awslabs/aws-c-common/blob/9fd58f977d5779f8a695dd963e75cf3abee8231e/include/aws/common/byte_buf.h#L27>
 #[repr(C)]
 pub struct AWSByteBuf {
@@ -27,9 +27,9 @@ impl From<&[u8]> for AWSByteBuf {
 
         // For simplicity, we only allocate exactly the amount of memory needed.
         let len = value.len();
-        
+
         let buffer = unsafe {
-            // SAFTEY: 
+            // SAFTEY:
             // - Align comes from the `u8` type, and is therefore valid.
             // - Size is assumed to be valid as it comes from the slice.
             let layout = Layout::from_size_align_unchecked(len, std::mem::align_of::<u8>());
@@ -59,17 +59,18 @@ impl From<&[u8]> for AWSByteBuf {
 impl Drop for AWSByteBuf {
     fn drop(&mut self) {
         if self.allocator.is_null() {
-            // SAFETY: 
-            // - By the invariants of this type, if the allocator is null, 
+            // SAFETY:
+            // - By the invariants of this type, if the allocator is null,
             //   the buffer was allocated by Rust code.
-            // 
+            //
             // - The capacity is assumed to be correct
-            // 
+            //
             // - The buffer is assumed to be properly aligned, since its created by Rust code.
-            // 
+            //
             // - `u8` has noop destructor, no need to call drop.
             unsafe {
-                let layout = Layout::from_size_align_unchecked(self.len, std::mem::align_of::<u8>());
+                let layout =
+                    Layout::from_size_align_unchecked(self.len, std::mem::align_of::<u8>());
 
                 std::alloc::dealloc(self.buffer, layout);
             }

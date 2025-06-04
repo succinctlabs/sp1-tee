@@ -86,6 +86,7 @@ pub struct ServerArgs {
 }
 
 #[derive(Debug, thiserror::Error)]
+#[allow(clippy::large_enum_variant)]
 pub enum ServerError {
     #[error("Failed to connect to enclave")]
     FailedToConnectToEnclave,
@@ -177,9 +178,10 @@ impl IntoResponse for ServerError {
                 format!("Failed to get attestations, {}", e),
             ),
             #[cfg(feature = "production")]
-            ServerError::FailedToAuthenticateRequest => {
-                (StatusCode::UNAUTHORIZED, "Failed to authenticate request".to_string())
-            }
+            ServerError::FailedToAuthenticateRequest => (
+                StatusCode::UNAUTHORIZED,
+                "Failed to authenticate request".to_string(),
+            ),
         };
 
         err.into_response()
@@ -270,8 +272,7 @@ pub async fn get_enclave_measurement() -> Result<EnclaveMeasurement, ServerError
     command.arg("describe-enclaves");
 
     let output = command.output().await?;
-    let raw =
-        String::from_utf8(output.stdout).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    let raw = String::from_utf8(output.stdout).map_err(io::Error::other)?;
 
     let all = serde_json::from_str::<Vec<Wrapper>>(&raw)?;
 

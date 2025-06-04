@@ -38,10 +38,9 @@ pub const S3_BUCKET: &str = "sp1-tee-attestations-testing";
 ///
 /// The default filter is `sp1-tee-server=debug,info`.
 pub fn init_tracing() {
-    let default_env_filter = EnvFilter::try_from_default_env().unwrap_or(
-        EnvFilter::try_from("sp1_tee_server=debug,sp1_tee_host=debug,info")
-            .expect("Failed to server default env filter"),
-    );
+    let default_env_filter = EnvFilter::try_from_default_env().unwrap_or(EnvFilter::from(
+        "sp1_tee_server=debug,sp1_tee_host=debug,info",
+    ));
 
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_line_number(true)
@@ -61,9 +60,9 @@ pub fn init_tracing() {
 }
 
 /// Converts a K256 encoded point to an Ethereum address.
-/// 
+///
 /// Ethereum address are derived as `keccack256([x || y])[12..]`
-/// 
+///
 /// Returns `None` if the point is not `uncompressed`.
 #[cfg(feature = "attestations")]
 pub fn ethereum_address_from_encoded_point(encoded_point: &k256::EncodedPoint) -> Option<Address> {
@@ -75,15 +74,15 @@ pub fn ethereum_address_from_encoded_point(encoded_point: &k256::EncodedPoint) -
 }
 
 /// Converts a K256 SEC1 encoded public key to an Ethereum address.
-/// 
+///
 /// SEC1 bytes are of the form:
-/// 
+///
 /// ```
 /// [ 0x04 || x || y ]
 /// ```
-/// 
+///
 /// Ethereum address are derived as `keccack256([x || y])[12..]`
-/// 
+///
 /// Returns `None` if the format is invalid.
 #[cfg(feature = "attestations")]
 pub fn ethereum_address_from_sec1_bytes(public_key: &[u8]) -> Option<Address> {

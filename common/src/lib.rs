@@ -1,7 +1,7 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 mod communication;
-pub use communication::{VsockStream, CommunicationError};
+pub use communication::{CommunicationError, VsockStream};
 
 /// A VSOCK address is defined as the tuple of (CID, port).
 ///
@@ -41,7 +41,7 @@ pub enum EnclaveResponse {
     /// An attestation document with the public key field set.
     SigningKeyAttestation(Vec<u8>),
     /// The result of an execution, sent from the enclave to the host.
-    /// 
+    ///
     /// The signature is of the form [ vkey || public_values ]
     SignedPublicValues {
         vkey: [u8; 32],
@@ -73,7 +73,7 @@ impl EnclaveResponse {
     pub fn type_of(&self) -> &'static str {
         match self {
             EnclaveResponse::PublicKey(_) => "PublicKey",
-            EnclaveResponse::EncryptedSigningKey(_) => "EncryptedSigningKey",   
+            EnclaveResponse::EncryptedSigningKey(_) => "EncryptedSigningKey",
             EnclaveResponse::SigningKeyAttestation(_) => "SigningKeyAttestation",
             EnclaveResponse::SignedPublicValues { .. } => "SignedPublicValues",
             EnclaveResponse::Error(_) => "Error",

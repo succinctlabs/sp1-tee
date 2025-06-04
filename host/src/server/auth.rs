@@ -1,9 +1,9 @@
 use alloy::primitives::Address;
 use sp1_sdk::network::proto::network::{
-    prover_network_client::ProverNetworkClient, GetTeeWhitelistStatusRequest
+    prover_network_client::ProverNetworkClient, GetTeeWhitelistStatusRequest,
 };
 use std::time::Duration;
-use tonic::transport::{ClientTlsConfig, Endpoint, Error, Channel};
+use tonic::transport::{Channel, ClientTlsConfig, Endpoint, Error};
 
 pub struct AuthClient {
     url: String,
@@ -42,7 +42,9 @@ fn configure_endpoint(addr: &str) -> Result<Endpoint, Error> {
 
 impl AuthClient {
     pub fn new(addr: &str) -> Self {
-        Self { url: addr.to_string() }
+        Self {
+            url: addr.to_string(),
+        }
     }
 
     async fn get_prover_client(&self) -> Result<ProverNetworkClient<Channel>, AuthClientError> {

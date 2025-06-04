@@ -1,6 +1,6 @@
-use tokio_vsock::{VsockStream as VsockStreamRaw, VsockAddr};
+use serde::{de::DeserializeOwned, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use serde::{Serialize, de::DeserializeOwned};
+use tokio_vsock::{VsockAddr, VsockStream as VsockStreamRaw};
 
 pub struct VsockStream<In, Out> {
     stream: VsockStreamRaw,
@@ -9,22 +9,28 @@ pub struct VsockStream<In, Out> {
 
 impl<In, Out> VsockStream<In, Out> {
     pub fn new(stream: VsockStreamRaw) -> Self {
-        Self { stream, _marker: std::marker::PhantomData }
+        Self {
+            stream,
+            _marker: std::marker::PhantomData,
+        }
     }
 
     pub async fn connect(cid: u32, port: u32) -> Result<Self, CommunicationError> {
         let addr = VsockAddr::new(cid, port);
         let stream = VsockStreamRaw::connect(addr).await?;
 
-        Ok(Self { stream, _marker: std::marker::PhantomData })
+        Ok(Self {
+            stream,
+            _marker: std::marker::PhantomData,
+        })
     }
 }
 
 /// Async methods.
 impl<In, Out> VsockStream<In, Out>
-    where
-        In: DeserializeOwned,
-        Out: Serialize,
+where
+    In: DeserializeOwned,
+    Out: Serialize,
 {
     pub async fn send(&mut self, message: Out) -> Result<(), CommunicationError> {
         let message_bytes = bincode::serialize(&message)?;
@@ -56,7 +62,7 @@ impl<In, Out> VsockStream<In, Out>
         // Read the message bytes from the stream.
         self.stream.read_exact(&mut message_buf).await?;
 
-        // Deserialize the message bytes into the desired type. 
+        // Deserialize the message bytes into the desired type.
         Ok(bincode::deserialize(&message_buf)?)
     }
 }

@@ -14,7 +14,7 @@ use std::{
     time::Duration,
 };
 
-use crate::metrics::HostMetrics;
+use crate::metrics::HostMetric;
 
 pub mod stream;
 
@@ -58,8 +58,6 @@ impl Server {
 
         // Spawn a thread to collect metrics.
         spawn_metrics_thread(args.metrics_port, args.metrics_prefix.clone());
-
-        HostMetrics::RunningEnclaveGauge.increment();
 
         Arc::new(Self {
             execution_mutex: tokio::sync::Mutex::new(()),
@@ -341,7 +339,7 @@ pub fn spawn_attestation_task(cid: u32, port: u16, interval: Duration) {
 }
 
 pub fn spawn_metrics_thread(port: u16, prefix: Option<String>) {
-    HostMetrics::register();
+    HostMetric::register();
 
     let builder = PrometheusBuilder::new().with_http_listener(SocketAddr::new(
         IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),

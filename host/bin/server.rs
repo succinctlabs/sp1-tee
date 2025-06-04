@@ -11,7 +11,6 @@ use sp1_sdk::network::tee::SP1_TEE_VERSION;
 use sp1_tee_common::{EnclaveRequest, EnclaveResponse};
 use sp1_tee_host::{
     api::GetAddressResponse,
-    metrics::HostMetrics,
     server::{Server, ServerArgs, ServerError},
 };
 use sp1_tee_host::{
@@ -209,8 +208,10 @@ async fn execute(
     }
 
     let response = execute_inner(server.clone(), request);
-    let response =
-        stream::once(response).map(|response| Ok(sp1_tee_host::api::result_to_event(response)));
+    let response = stream::once(response).map(|response| {
+        sp1_tee_host::metrics::emit_response_metric(&response);
+        Ok(sp1_tee_host::api::result_to_event(response))
+    });
 
     Ok(Sse::new(response))
 }
@@ -280,8 +281,6 @@ async fn execute_inner(
             signature,
             recovery_id,
         } => {
-            HostMetrics::TeeExecutionCounter.increment();
-
             Ok(TEEResponse {
                 vkey,
                 public_values,
@@ -293,8 +292,6 @@ async fn execute_inner(
         EnclaveResponse::Error(error) => {
             // This error type is expected, it can happen if the execution fails.
             tracing::error!("Error during execution from enclave: {:?}", error);
-
-            HostMetrics::TeeExecutionErrorCounter.increment();
 
             Err(ServerError::EnclaveError(error))
         }

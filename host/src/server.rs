@@ -3,18 +3,8 @@ use auth::AuthClient;
 
 use axum::{http::StatusCode, response::IntoResponse, response::Response};
 use clap::Parser;
-use metrics_exporter_prometheus::PrometheusBuilder;
-use metrics_process::Collector;
 use serde::Deserialize;
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    path::Path,
-    sync::Arc,
-    thread,
-    time::Duration,
-};
-
-use crate::metrics::HostMetric;
+use std::{path::Path, sync::Arc, time::Duration};
 
 pub mod stream;
 
@@ -57,6 +47,7 @@ impl Server {
         );
 
         // Spawn a thread to collect metrics.
+        #[cfg(feature = "metrics")]
         spawn_metrics_thread(args.metrics_port, args.metrics_prefix.clone());
 
         Arc::new(Self {
@@ -338,7 +329,16 @@ pub fn spawn_attestation_task(cid: u32, port: u16, interval: Duration) {
     });
 }
 
+#[cfg(feature = "metrics")]
 pub fn spawn_metrics_thread(port: u16, prefix: Option<String>) {
+    use crate::metrics::HostMetric;
+    use metrics_exporter_prometheus::PrometheusBuilder;
+    use metrics_process::Collector;
+    use std::{
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+        thread,
+    };
+
     HostMetric::register();
 
     let builder = PrometheusBuilder::new().with_http_listener(SocketAddr::new(

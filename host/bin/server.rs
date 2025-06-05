@@ -209,6 +209,7 @@ async fn execute(
 
     let response = execute_inner(server.clone(), request);
     let response = stream::once(response).map(|response| {
+        #[cfg(feature = "metrics")]
         sp1_tee_host::metrics::emit_response_metric(&response);
         Ok(sp1_tee_host::api::result_to_event(response))
     });

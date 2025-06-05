@@ -40,9 +40,9 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 alert-subscriber = { workspace = true }
 hex = "0.4.3"
 axum = { version = "0.8.1", optional = true }
-metrics = { workspace = true }
-metrics-exporter-prometheus = { workspace = true }
-metrics-process = { workspace = true }
+metrics = { workspace = true, optional = true }
+metrics-exporter-prometheus = { workspace = true, optional = true }
+metrics-process = { workspace = true, optional = true }
 strum = { workspace = true }
 
 # Attestation Helpers
@@ -76,3 +76,8 @@ attestations = [
     "dep:attestation-doc-validation",
 ]
 client = []
+metrics = [
+    "dep:metrics",
+    "dep:metrics-exporter-prometheus",
+    "metrics-process"
+]

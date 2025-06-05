@@ -34,6 +34,7 @@ pub const S3_BUCKET: &str = "sp1-tee-attestations";
 #[cfg(not(feature = "production"))]
 pub const S3_BUCKET: &str = "sp1-tee-attestations-testing";
 
+#[cfg(feature = "metrics")]
 pub mod metrics;
 
 /// Initialize the tracing subscriber.

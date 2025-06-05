@@ -90,11 +90,11 @@ pub struct ServerArgs {
     pub prover_network_url: String,
 
     /// The metrics port.
-    #[clap(long, default_value = "9000")]
+    #[clap(long, env, default_value = "9000")]
     pub metrics_port: u16,
 
     /// The metrics labels prefix.
-    #[clap(long)]
+    #[clap(long, env)]
     pub metrics_prefix: Option<String>,
 }
 
@@ -356,6 +356,8 @@ pub fn spawn_metrics_thread(port: u16, prefix: Option<String>) {
     let prefix = prefix
         .map(|p| format!("sp1_tee_{p}_"))
         .unwrap_or_else(|| "sp1_tee_".to_string());
+
+    tracing::debug!("Metrics labels prefix: {prefix}");
 
     thread::spawn(move || {
         let collector = Collector::new(prefix);

@@ -39,11 +39,16 @@ impl Server {
         start_enclave(args);
 
         // Spawn a task to save attestations to S3.
+        #[cfg(feature = "production")]
         spawn_attestation_task(
             args.enclave_cid,
             sp1_tee_common::ENCLAVE_PORT,
             crate::attestations::ATTESTATION_INTERVAL,
         );
+
+        // Spawn a thread to collect metrics.
+        #[cfg(feature = "metrics")]
+        spawn_metrics_thread(args.metrics_port, args.metrics_prefix.clone());
 
         Arc::new(Self {
             execution_mutex: tokio::sync::Mutex::new(()),
@@ -83,6 +88,14 @@ pub struct ServerArgs {
     /// The RPC URL of the prover network.
     #[clap(long, default_value = "https://rpc.production.succinct.xyz/")]
     pub prover_network_url: String,
+
+    /// The metrics port.
+    #[clap(long, env, default_value = "9000")]
+    pub metrics_port: u16,
+
+    /// The metrics labels prefix.
+    #[clap(long, env)]
+    pub metrics_prefix: Option<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -312,6 +325,47 @@ pub fn spawn_attestation_task(cid: u32, port: u16, interval: Duration) {
             }
 
             interval.tick().await;
+        }
+    });
+}
+
+#[cfg(feature = "metrics")]
+pub fn spawn_metrics_thread(port: u16, prefix: Option<String>) {
+    use crate::metrics::HostMetric;
+    use metrics_exporter_prometheus::PrometheusBuilder;
+    use metrics_process::Collector;
+    use std::{
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+        thread,
+    };
+
+    HostMetric::register();
+
+    let builder = PrometheusBuilder::new().with_http_listener(SocketAddr::new(
+        IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+        port.to_owned(),
+    ));
+
+    if let Err(e) = builder.install() {
+        tracing::warn!(
+            "Failed to start metrics server: {}. Will continue without metrics.",
+            e
+        );
+    }
+
+    let prefix = prefix
+        .map(|p| format!("sp1_tee_{p}_"))
+        .unwrap_or_else(|| "sp1_tee_".to_string());
+
+    tracing::debug!("Metrics labels prefix: {prefix}");
+
+    thread::spawn(move || {
+        let collector = Collector::new(prefix);
+        collector.describe();
+        loop {
+            // Periodically call `collect()` method to update informations.
+            collector.collect();
+            thread::sleep(Duration::from_millis(750));
         }
     });
 }

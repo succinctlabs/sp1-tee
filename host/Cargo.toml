@@ -29,6 +29,7 @@ tokio-vsock = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 
 clap = { workspace = true }
+dotenv = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 k256 = { workspace = true }
@@ -39,6 +40,10 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 alert-subscriber = { workspace = true }
 hex = "0.4.3"
 axum = { version = "0.8.1", optional = true }
+metrics = { workspace = true, optional = true }
+metrics-exporter-prometheus = { workspace = true, optional = true }
+metrics-process = { workspace = true, optional = true }
+strum = { workspace = true }
 
 # Attestation Helpers
 aws-nitro-enclaves-cose = { version = "0.5", optional = true }
@@ -71,3 +76,8 @@ attestations = [
     "dep:attestation-doc-validation",
 ]
 client = []
+metrics = [
+    "dep:metrics",
+    "dep:metrics-exporter-prometheus",
+    "metrics-process"
+]

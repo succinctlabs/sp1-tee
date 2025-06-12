@@ -1,2 +1,5 @@
 /target
+node_modules
 .env
+cdk.context.json
+cdk.out

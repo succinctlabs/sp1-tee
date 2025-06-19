@@ -1,6 +1,5 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
-import { readFileSync } from "fs";
 
 export class Sp1TeeStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -43,8 +42,41 @@ export class Sp1TeeStack extends cdk.Stack {
             },
         );
 
-        let userData = readFileSync("./scripts/user-data.sh", "utf-8");
-        userData = this.base64_encode(userData);
+        enclaveSg.addIngressRule(
+            cdk.aws_ec2.Peer.anyIpv4(),
+            cdk.aws_ec2.Port.tcp(22),
+            "Allow SSH access",
+        );
+
+        const secret = cdk.aws_secretsmanager.Secret.fromSecretNameV2(
+            this,
+            "SP1_TEE_Secret",
+            "sp1_tee",
+        );
+
+        secret.grantRead(role);
+
+        const userData = cdk.aws_ec2.UserData.forLinux();
+        userData.addCommands(
+            "su ec2-user",
+            "sudo dnf install git aws-cli jq -y",
+
+            "cd /home/ec2-user",
+            "git clone https://github.com/succinctlabs/sp1-tee.git",
+            "cd sp1-tee",
+            "git checkout aurelien/automate-deployments", // TODO: Remove
+
+            "export HOME=/home/ec2-user",
+
+            // Retrieve secrets and add them to .env file
+            `SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${secret.secretArn} --region ${this.region} --query SecretString --output text)`,
+            "SEAL_URL=$(echo $SECRET_JSON | jq -r .seal_url)",
+            "SEAL_BEARER_TOKEN=$(echo $SECRET_JSON | jq -r .seal_bearer_token)",
+            'echo "SEAL_URL=$SEAL_URL" >> .env',
+            'echo "SEAL_BEARER_TOKEN=$SEAL_BEARER_TOKEN" >> .env',
+
+            "./scripts/install-host.sh", // TODO: Add --production
+        );
 
         const launchTemplate = new cdk.aws_ec2.LaunchTemplate(
             this,
@@ -53,7 +85,7 @@ export class Sp1TeeStack extends cdk.Stack {
                 instanceType: new cdk.aws_ec2.InstanceType("m5a.4xlarge"),
                 machineImage: cdk.aws_ec2.MachineImage.latestAmazonLinux2023(),
                 securityGroup: enclaveSg,
-                userData: cdk.aws_ec2.UserData.custom(userData),
+                userData,
                 nitroEnclaveEnabled: true,
                 role,
             },
@@ -66,7 +98,7 @@ export class Sp1TeeStack extends cdk.Stack {
                 {
                     vpc,
                     vpcSubnets: {
-                        subnetType: cdk.aws_ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                        subnetType: cdk.aws_ec2.SubnetType.PUBLIC,
                     },
                     internetFacing: false,
                 },
@@ -81,7 +113,7 @@ export class Sp1TeeStack extends cdk.Stack {
                 launchTemplate,
                 vpc,
                 vpcSubnets: {
-                    subnetType: cdk.aws_ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                    subnetType: cdk.aws_ec2.SubnetType.PUBLIC,
                 },
                 updatePolicy: cdk.aws_autoscaling.UpdatePolicy.rollingUpdate(),
             },
@@ -103,15 +135,5 @@ export class Sp1TeeStack extends cdk.Stack {
                 ),
             ],
         });
-    }
-
-    base64_encode(str: string): string {
-        // create a buffer
-        const buff = Buffer.from(str, "utf-8");
-
-        // decode buffer as Base64
-        const base64 = buff.toString("base64");
-
-        return base64;
     }
 }

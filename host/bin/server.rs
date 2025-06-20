@@ -35,15 +35,10 @@ async fn main() {
     // Just in case the server was killed uncleanly last time.
     sp1_tee_host::server::terminate_enclaves();
 
-    // Add the new signer
-    sp1_tee_host::setup::register_signer(&args, sp1_tee_common::ENCLAVE_PORT)
-        .await
-        .expect("Failed to register the signer");
-
     // Start the server.
     //
     // This function also starts the enclave and spawns a task to save attestations to S3.
-    let server = Server::new(&args);
+    let server = Server::new(&args).await;
 
     let app = Router::new()
         .route("/execute", post(execute).layer(DefaultBodyLimit::disable()))

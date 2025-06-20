@@ -29,7 +29,7 @@ impl Server {
     /// Create a new server.
     ///
     /// This function will block and start the enclave and spawn a task to save attestations to S3.
-    pub fn new(args: &ServerArgs) -> Arc<Self> {
+    pub async fn new(args: &ServerArgs) -> Arc<Self> {
         #[cfg(feature = "production")]
         {
             if args.debug {
@@ -39,6 +39,11 @@ impl Server {
 
         // Blocking start the enclave.
         start_enclave(args);
+
+        // Add the new signer
+        crate::setup::register_signer(&args, sp1_tee_common::ENCLAVE_PORT)
+            .await
+            .expect("Failed to register the signer");
 
         // Spawn a task to save attestations to S3.
         spawn_attestation_task(

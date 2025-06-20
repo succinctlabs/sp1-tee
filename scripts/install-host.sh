@@ -34,13 +34,6 @@ sudo systemctl restart nitro-enclaves-allocator.service
 # Copy the tee-service template to the systemd directory.
 sudo cp tee-service.template.service /etc/systemd/system/tee-service.service
 
-# Install the setup binary
-if [ "$1" = "--production" ]; then
-    cargo install --path host --bin sp1-tee-setup --features production
-else
-    cargo install --path host --bin sp1-tee-setup
-fi
-
 # Enable and start the tee-service if the --production flag is passed.
 if [ "$1" = "--production" ]; then
     # Install the tee server binary.

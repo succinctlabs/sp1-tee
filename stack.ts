@@ -59,13 +59,7 @@ export class Sp1TeeStack extends cdk.Stack {
         const userData = cdk.aws_ec2.UserData.forLinux();
         userData.addCommands(
             "dnf install git aws-cli jq -y",
-
             "cd /home/ec2-user",
-            "git clone https://github.com/succinctlabs/sp1-tee.git",
-            "cd sp1-tee",
-            "git checkout aurelien/automate-deployments", // TODO: Remove
-
-            "mv Dockerfile.enclave Dockerfile",
 
             // Retrieve secrets and add them to .env file
             `SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${secret.secretArn} --region ${this.region} --query SecretString --output text)`,
@@ -78,6 +72,11 @@ export class Sp1TeeStack extends cdk.Stack {
             'echo "RPC_URL=$RPC_URL" >> .env',
             'echo "PRIVATE_KEY=$PRIVATE_KEY" >> .env',
 
+            // Clone the repo
+            "git clone https://github.com/succinctlabs/sp1-tee.git",
+            "cd sp1-tee",
+            "git checkout aurelien/automate-deployments", // TODO: Remove
+            "mv Dockerfile.enclave Dockerfile",
             "chown -R ec2-user:ec2-user .",
 
             "sudo -u ec2-user ./scripts/install-host.sh", // TODO: Add --production

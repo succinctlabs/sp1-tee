@@ -26,6 +26,9 @@ pub mod server;
 #[cfg(feature = "server")]
 pub use server::stream::HostStream;
 
+#[cfg(feature = "server")]
+pub mod setup;
+
 #[cfg(feature = "client")]
 pub use sp1_sdk::network::tee::client::{Client, ClientError};
 

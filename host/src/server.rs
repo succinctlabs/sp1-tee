@@ -6,6 +6,8 @@ use clap::Parser;
 use serde::Deserialize;
 use std::{path::Path, sync::Arc, time::Duration};
 
+use crate::SaveAttestationError;
+
 pub mod stream;
 
 #[cfg(feature = "production")]
@@ -83,6 +85,14 @@ pub struct ServerArgs {
     /// The RPC URL of the prover network.
     #[clap(long, default_value = "https://rpc.production.succinct.xyz/")]
     pub prover_network_url: String,
+
+    /// The RPC URL of the Ethereum network.
+    #[clap(long, env)]
+    pub rpc_url: String,
+
+    /// The private key to use.
+    #[clap(long, env)]
+    pub private_key: String,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -297,14 +307,7 @@ pub fn spawn_attestation_task(cid: u32, port: u16, interval: Duration) {
         let mut interval = tokio::time::interval(interval);
 
         loop {
-            if let Err(e) =
-                crate::attestations::save_attestation(crate::attestations::SaveAttestationArgs {
-                    cid,
-                    port,
-                    ..Default::default()
-                })
-                .await
-            {
+            if let Err(e) = save_attestation(cid, port).await {
                 tracing::error!("Failed to save attestation: {}", e);
 
                 tokio::time::sleep(TRY_AGAIN_INTERVAL).await;
@@ -314,4 +317,15 @@ pub fn spawn_attestation_task(cid: u32, port: u16, interval: Duration) {
             interval.tick().await;
         }
     });
+}
+
+async fn save_attestation(cid: u32, port: u16) -> Result<(), SaveAttestationError> {
+    let bucket = crate::S3_BUCKET.to_string();
+
+    tracing::debug!(cid, port, bucket, "Save attestation");
+
+    let raw_attestation = crate::attestations::retrieve_attestation_from_enclave(cid, port).await?;
+    crate::attestations::save_attestation(raw_attestation, bucket).await?;
+
+    Ok(())
 }

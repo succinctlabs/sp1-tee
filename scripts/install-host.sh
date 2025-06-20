@@ -20,7 +20,7 @@ sudo systemctl enable --now docker
 curl https://sh.rustup.rs -sSf | sh -s -- -y
 
 # Source the cargo env.
-source $HOME/.cargo/env
+source ~/.cargo/env
 
 # Initialize the submodules.
 git submodule update --init --recursive

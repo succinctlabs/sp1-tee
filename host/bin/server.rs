@@ -24,6 +24,8 @@ use futures::stream::{self, Stream, StreamExt};
 
 #[tokio::main]
 async fn main() {
+    dotenv::dotenv().ok();
+
     sp1_tee_host::init_tracing();
 
     let args = ServerArgs::parse();
@@ -32,6 +34,11 @@ async fn main() {
     //
     // Just in case the server was killed uncleanly last time.
     sp1_tee_host::server::terminate_enclaves();
+
+    // Add the new signer
+    sp1_tee_host::setup::register_signer(&args, sp1_tee_common::ENCLAVE_PORT)
+        .await
+        .expect("Failed to register the signer");
 
     // Start the server.
     //

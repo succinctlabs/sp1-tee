@@ -1,20 +1,19 @@
 //! Deploy the SP1 TEE contracts.
 //!
 //! Otherwise, it will just try to add signers to the existing contracts.
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use alloy::network::EthereumWallet;
 use alloy::primitives::Address;
 use alloy::providers::{Provider, ProviderBuilder, WalletProvider};
 use alloy::signers::local::PrivateKeySigner;
-use serde::Deserialize;
 
 use clap::Parser;
 
 use sp1_tee_host::attestations::RawAttestation;
 use sp1_tee_host::contract::TEEVerifier;
 use sp1_tee_host::ethereum_address_from_sec1_bytes;
+use sp1_tee_host::setup::retrieve_tee_verifier_contract_address;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -96,12 +95,6 @@ struct Args {
     verifier_gateway: Option<Address>,
 }
 
-#[derive(Debug, Deserialize)]
-struct Deployment {
-    #[serde(rename = "SP1TeeVerifier")]
-    sp1_tee_verifier: Address,
-}
-
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
@@ -163,14 +156,9 @@ async fn main() {
         .await
         .expect("Failed to get chain id");
 
-    // Load the deployment from the path.
-    let deployment_path = contracts_path(chain_id);
-    let deployment: Deployment = serde_json::from_reader(
-        std::fs::File::open(deployment_path).expect("Failed to open deployment.json"),
-    )
-    .expect("Failed to parse deployment.json");
+    let sp1_tee_verifier = retrieve_tee_verifier_contract_address(chain_id).unwrap();
 
-    println!("Deployed Verifier: {:?}", deployment.sp1_tee_verifier);
+    println!("Deployed Verifier: {:?}", sp1_tee_verifier);
 
     ///////////////////////////////
     // Add the signers
@@ -180,7 +168,7 @@ async fn main() {
         .await
         .expect("Failed to get attestations");
 
-    let verifier = TEEVerifier::new(deployment.sp1_tee_verifier, provider);
+    let verifier = TEEVerifier::new(sp1_tee_verifier, provider);
 
     // For each attestation, verify the attestation and add the signer, optionally checking the PCR0.
     for RawAttestation {
@@ -309,20 +297,4 @@ fn anvil_deploy_args<P: WalletProvider>(cmd: &mut Command, args: &Args, provider
         "--private-key",
         args.private_key.as_ref(),
     ]);
-}
-
-fn contracts_path(chain_id: u64) -> PathBuf {
-    const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
-
-    let mut path = PathBuf::from(MANIFEST_DIR);
-    path = path
-        .parent()
-        .expect("Failed to get parent of manifest dir")
-        .to_path_buf();
-
-    path.push("contracts");
-    path.push("deployments");
-    path.push(format!("{}.json", chain_id));
-
-    path
 }

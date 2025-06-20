@@ -40,6 +40,7 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 alert-subscriber = { workspace = true }
 hex = "0.4.3"
 axum = { version = "0.8.1", optional = true }
+backon = "1.5.1"
 
 # Attestation Helpers
 aws-nitro-enclaves-cose = { version = "0.5", optional = true }
@@ -63,7 +64,14 @@ tokio = { workspace = true }
 default = ["server"]
 # Use production constants.
 production = []
-server = ["attestations", "dep:axum", "dep:tokio-vsock", "dep:tokio", "dep:futures", "dep:tonic"]
+server = [
+    "attestations",
+    "dep:axum",
+    "dep:tokio-vsock",
+    "dep:tokio",
+    "dep:futures",
+    "dep:tonic",
+]
 attestations = [
     "dep:aws-config",
     "dep:aws-sdk-s3",

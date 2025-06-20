@@ -58,24 +58,29 @@ export class Sp1TeeStack extends cdk.Stack {
 
         const userData = cdk.aws_ec2.UserData.forLinux();
         userData.addCommands(
-            "su ec2-user",
-            "sudo dnf install git aws-cli jq -y",
+            "dnf install git aws-cli jq -y",
 
             "cd /home/ec2-user",
             "git clone https://github.com/succinctlabs/sp1-tee.git",
             "cd sp1-tee",
             "git checkout aurelien/automate-deployments", // TODO: Remove
 
-            "export HOME=/home/ec2-user",
+            "mv Dockerfile.enclave Dockerfile",
 
             // Retrieve secrets and add them to .env file
             `SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${secret.secretArn} --region ${this.region} --query SecretString --output text)`,
             "SEAL_URL=$(echo $SECRET_JSON | jq -r .seal_url)",
             "SEAL_BEARER_TOKEN=$(echo $SECRET_JSON | jq -r .seal_bearer_token)",
+            "RPC_URL=$(echo $SECRET_JSON | jq -r .rpc_url)",
+            "PRIVATE_KEY=$(echo $SECRET_JSON | jq -r .private_key)",
             'echo "SEAL_URL=$SEAL_URL" >> .env',
             'echo "SEAL_BEARER_TOKEN=$SEAL_BEARER_TOKEN" >> .env',
+            'echo "RPC_URL=$RPC_URL" >> .env',
+            'echo "PRIVATE_KEY=$PRIVATE_KEY" >> .env',
 
-            "./scripts/install-host.sh", // TODO: Add --production
+            "chown -R ec2-user:ec2-user .",
+
+            "sudo -u ec2-user ./scripts/install-host.sh", // TODO: Add --production
         );
 
         const launchTemplate = new cdk.aws_ec2.LaunchTemplate(
@@ -88,6 +93,15 @@ export class Sp1TeeStack extends cdk.Stack {
                 userData,
                 nitroEnclaveEnabled: true,
                 role,
+                blockDevices: [
+                    {
+                        deviceName: "/dev/xvda",
+                        volume: cdk.aws_ec2.BlockDeviceVolume.ebs(50, {
+                            volumeType: cdk.aws_ec2.EbsDeviceVolumeType.GP3,
+                            deleteOnTermination: true,
+                        }),
+                    },
+                ],
             },
         );
 

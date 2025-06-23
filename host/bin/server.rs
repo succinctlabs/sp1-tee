@@ -16,8 +16,8 @@ use sp1_tee_host::{
     api::{TEERequest, TEEResponse},
     HostStream,
 };
-use std::convert::Infallible;
 use std::sync::Arc;
+use std::{convert::Infallible, env::consts::OS};
 use tokio::net::TcpListener;
 
 use futures::stream::{self, Stream, StreamExt};
@@ -44,6 +44,7 @@ async fn main() {
         .route("/execute", post(execute).layer(DefaultBodyLimit::disable()))
         .route("/address", get(get_address))
         .route("/signers", get(get_signers))
+        .route("/health", get(health))
         .with_state(server);
 
     let listener = TcpListener::bind((args.address.clone(), args.port))
@@ -303,4 +304,11 @@ async fn execute_inner(
             Err(ServerError::UnexpectedResponseFromEnclave)
         }
     }
+}
+
+async fn health(State(server): State<Arc<Server>>) -> Result<(), ServerError> {
+    // Checking we can communicate with the enclave
+    let _ = get_address(State(server)).await?;
+
+    Ok(())
 }

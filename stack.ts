@@ -1,9 +1,20 @@
 import * as cdk from "aws-cdk-lib";
+import * as acm from "aws-cdk-lib/aws-certificatemanager";
+import * as route53 from "aws-cdk-lib/aws-route53";
+import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import { Construct } from "constructs";
 
 export class Sp1TeeStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props?: cdk.StackProps) {
         super(scope, id, props);
+
+        const certificateArn = new cdk.CfnParameter(this, "CertificateArn", {
+            type: "String",
+            description: "ARN of the SSL certificate for HTTPS listener",
+            default:
+                "arn:aws:acm:us-west-1:421253708207:certificate/e2d50c31-c82b-4434-880f-0823c06c2a3d",
+            //"arn:aws:acm:us-west-1:421253708207:certificate/f961b604-7c7a-4368-9dfd-66b4b1f7f19e",
+        });
 
         const vpc = new cdk.aws_ec2.Vpc(this, "SP1_TEE_VPC", {
             natGateways: 1,
@@ -82,9 +93,83 @@ export class Sp1TeeStack extends cdk.Stack {
             "sudo -u ec2-user ./scripts/install-host.sh", // TODO: Add --production
         );
 
+        const loadBalancer =
+            new cdk.aws_elasticloadbalancingv2.ApplicationLoadBalancer(
+                this,
+                "SP1_TEE_ApplicationLoadBalancer",
+                {
+                    vpc,
+                    vpcSubnets: {
+                        subnetType: cdk.aws_ec2.SubnetType.PUBLIC,
+                    },
+                    internetFacing: true,
+                },
+            );
+
+        const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
+            this,
+            "SP1_TEE_HostedZone",
+            {
+                hostedZoneId: "Z07931692VMB8INXEKFYF", // TODO: Update
+                zoneName: "succinct.tools",
+            },
+        );
+
+        // Create A record (alias) pointing domain to load balancer
+        new route53.ARecord(this, "SP1_TEE_ARecord", {
+            zone: hostedZone,
+            recordName: "tee",
+            target: route53.RecordTarget.fromAlias(
+                new route53Targets.LoadBalancerTarget(loadBalancer),
+            ),
+            ttl: undefined, // TTL is automatically set for alias records
+        });
+
+        const certificate = acm.Certificate.fromCertificateArn(
+            this,
+            "SP1_TEE_Certificate",
+            certificateArn.valueAsString,
+        );
+
+        const httpsListener = loadBalancer.addListener(
+            "SP1_TEE_ApplicationLoadBalancer_HTTPSListener",
+            {
+                port: 443,
+                defaultAction:
+                    cdk.aws_elasticloadbalancingv2.ListenerAction.fixedResponse(
+                        400,
+                        {
+                            contentType: "text/plain",
+                            messageBody: "Missing version",
+                        },
+                    ),
+                protocol:
+                    cdk.aws_elasticloadbalancingv2.ApplicationProtocol.HTTPS,
+                certificates: [certificate],
+            },
+        );
+
+        this.createVersionedInfrastructure(
+            "1",
+            vpc,
+            enclaveSg,
+            userData,
+            role,
+            httpsListener,
+        );
+    }
+
+    createVersionedInfrastructure(
+        version: string,
+        vpc: cdk.aws_ec2.Vpc,
+        enclaveSg: cdk.aws_ec2.SecurityGroup,
+        userData: cdk.aws_ec2.UserData,
+        role: cdk.aws_iam.Role,
+        httpsListener: cdk.aws_elasticloadbalancingv2.ApplicationListener,
+    ) {
         const launchTemplate = new cdk.aws_ec2.LaunchTemplate(
             this,
-            "SP1_TEE_LaunchTemplate",
+            `SP1_TEE_LaunchTemplate_V${version}`,
             {
                 instanceType: new cdk.aws_ec2.InstanceType("m5a.4xlarge"),
                 machineImage: cdk.aws_ec2.MachineImage.latestAmazonLinux2023(),
@@ -104,22 +189,9 @@ export class Sp1TeeStack extends cdk.Stack {
             },
         );
 
-        const loadBalancer =
-            new cdk.aws_elasticloadbalancingv2.NetworkLoadBalancer(
-                this,
-                "SP1_TEE_NetworkLoadBalancer",
-                {
-                    vpc,
-                    vpcSubnets: {
-                        subnetType: cdk.aws_ec2.SubnetType.PUBLIC,
-                    },
-                    internetFacing: false,
-                },
-            );
-
         const asg = new cdk.aws_autoscaling.AutoScalingGroup(
             this,
-            "SP1_TEE_AutoScalingGroup",
+            `SP1_TEE_AutoScalingGroup_V${version}`,
             {
                 minCapacity: 2,
                 maxCapacity: 2,
@@ -132,21 +204,33 @@ export class Sp1TeeStack extends cdk.Stack {
             },
         );
 
-        loadBalancer.addListener("SP1_TEE_NetworkLoadBalancer_HTTPSListener", {
-            port: 443,
-            protocol: cdk.aws_elasticloadbalancingv2.Protocol.TCP,
-            defaultTargetGroups: [
-                new cdk.aws_elasticloadbalancingv2.NetworkTargetGroup(
-                    this,
-                    "SP1_TEE_NetworkLoadBalancer_AutoScalingGroupTarget",
-                    {
-                        targets: [asg],
-                        protocol: cdk.aws_elasticloadbalancingv2.Protocol.TCP,
-                        port: 443,
-                        vpc,
+        const targetGroup =
+            new cdk.aws_elasticloadbalancingv2.ApplicationTargetGroup(
+                this,
+                `SP1_TEE_TargetGroup_V${version}`,
+                {
+                    targets: [asg],
+                    protocol:
+                        cdk.aws_elasticloadbalancingv2.ApplicationProtocol.HTTP,
+                    port: 8080,
+                    vpc,
+                    healthCheck: {
+                        path: "/health",
+                        protocol: cdk.aws_elasticloadbalancingv2.Protocol.HTTP,
+                        port: "8080",
                     },
+                },
+            );
+
+        httpsListener.addTargetGroups(`SP1_TEE_V${version}_Rule`, {
+            targetGroups: [targetGroup],
+            conditions: [
+                cdk.aws_elasticloadbalancingv2.ListenerCondition.httpHeader(
+                    "X-SP1-TEE-Version",
+                    [version],
                 ),
             ],
+            priority: 100,
         });
     }
 }

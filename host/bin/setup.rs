@@ -13,7 +13,7 @@ use clap::Parser;
 use sp1_tee_host::attestations::RawAttestation;
 use sp1_tee_host::contract::TEEVerifier;
 use sp1_tee_host::ethereum_address_from_sec1_bytes;
-use sp1_tee_host::setup::retrieve_tee_verifier_contract_address;
+use sp1_tee_host::setup::{contracts_path, retrieve_tee_verifier_contract_address};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -156,7 +156,8 @@ async fn main() {
         .await
         .expect("Failed to get chain id");
 
-    let sp1_tee_verifier = retrieve_tee_verifier_contract_address(chain_id).unwrap();
+    let deployment_path = contracts_path(chain_id);
+    let sp1_tee_verifier = retrieve_tee_verifier_contract_address(deployment_path).unwrap();
 
     println!("Deployed Verifier: {:?}", sp1_tee_verifier);
 

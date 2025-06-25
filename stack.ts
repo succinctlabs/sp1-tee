@@ -4,6 +4,8 @@ import * as route53 from "aws-cdk-lib/aws-route53";
 import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import { Construct } from "constructs";
 
+const CHAIN_IDS = [11155111];
+
 export class Sp1TeeStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props?: cdk.StackProps) {
         super(scope, id, props);
@@ -66,22 +68,34 @@ export class Sp1TeeStack extends cdk.Stack {
         secret.grantRead(role);
 
         const userData = cdk.aws_ec2.UserData.forLinux();
-        userData.addCommands(
-            "dnf install git aws-cli jq -y",
-            "cd /home/ec2-user",
 
-            // Retrieve secrets and add them to .env file
+        userData.addCommands("dnf install git aws-cli jq -y");
+        userData.addCommands("cd /home/ec2-user");
+
+        // Retrieve secrets and add them to .env file
+        userData.addCommands(
             `SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${secret.secretArn} --region ${this.region} --query SecretString --output text)`,
             "SEAL_URL=$(echo $SECRET_JSON | jq -r .seal_url)",
             "SEAL_BEARER_TOKEN=$(echo $SECRET_JSON | jq -r .seal_bearer_token)",
-            "RPC_URL=$(echo $SECRET_JSON | jq -r .rpc_url)",
             "PRIVATE_KEY=$(echo $SECRET_JSON | jq -r .private_key)",
-            'echo "SEAL_URL=$SEAL_URL" >> .env',
             'echo "SEAL_BEARER_TOKEN=$SEAL_BEARER_TOKEN" >> .env',
-            'echo "RPC_URL=$RPC_URL" >> .env',
+            'echo "SEAL_URL=$SEAL_URL" >> .env',
             'echo "PRIVATE_KEY=$PRIVATE_KEY" >> .env',
+        );
 
-            // Clone the repo
+        // Add RPC URLs for all supported chains
+        CHAIN_IDS.forEach((chainId) => {
+            userData.addCommands(
+                `RPC_URL_${chainId}=$(echo $SECRET_JSON | jq -r .rpc_url_${chainId})`,
+            );
+            userData.addCommands(
+                `echo "RPC_URL_${chainId}=$RPC_URL_${chainId}" >> .env`,
+            );
+        });
+
+        // Clone the repo
+        userData.addCommands(
+            "cd /home/ec2-user",
             "git clone https://github.com/succinctlabs/sp1-tee.git",
             "cd sp1-tee",
             "git checkout aurelien/automate-deployments", // TODO: Remove

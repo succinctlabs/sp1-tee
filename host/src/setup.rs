@@ -1,9 +1,7 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, ffi::OsStr, fs, path::PathBuf};
 
 use alloy::{
-    network::EthereumWallet,
-    primitives::Address,
-    providers::{Provider, ProviderBuilder},
+    network::EthereumWallet, primitives::Address, providers::ProviderBuilder,
     signers::local::PrivateKeySigner,
 };
 use serde::Deserialize;
@@ -67,47 +65,54 @@ pub async fn register_signer(args: &ServerArgs, port: u16) -> Result<(), Registe
         .map_err(|_| RegisterSignerError::FailedToParsePrivateKey)?;
 
     let wallet = EthereumWallet::new(signer);
-    let provider = ProviderBuilder::new().wallet(wallet).connect_http(
-        args.rpc_url
-            .parse()
-            .map_err(|_| RegisterSignerError::FailedToParseRpcUrl)?,
-    );
-    let chain_id = provider.get_chain_id().await?;
-    let sp1_tee_verifier_address = retrieve_tee_verifier_contract_address(chain_id)?;
-    let verifier = TEEVerifier::new(sp1_tee_verifier_address, provider);
-    let raw_attestation = retrieve_attestation_from_enclave(args.enclave_cid, port).await?;
-    let doc = verify_attestation(&raw_attestation.attestation)?;
+    for (chain_id, deployment_json_path) in deployment_jsons() {
+        if let Some(rpc_url) = std::env::var(format!("RPC_URL_{chain_id}")).ok() {
+            tracing::info!("Adding signer for chain id {chain_id}");
 
-    // Derive the address from the public key.
-    let pubkey_bytes = doc
-        .public_key
-        .ok_or_else(|| RegisterSignerError::PublicKeyNotSet)?;
+            let provider = ProviderBuilder::new().wallet(wallet.clone()).connect_http(
+                rpc_url
+                    .parse()
+                    .map_err(|_| RegisterSignerError::FailedToParseRpcUrl)?,
+            );
+            let sp1_tee_verifier_address =
+                retrieve_tee_verifier_contract_address(deployment_json_path)?;
 
-    let derived_address = ethereum_address_from_sec1_bytes(&pubkey_bytes)
-        .ok_or_else(|| RegisterSignerError::FailedToDeriveAddress)?;
+            let verifier = TEEVerifier::new(sp1_tee_verifier_address, provider);
+            let raw_attestation = retrieve_attestation_from_enclave(args.enclave_cid, port).await?;
+            let doc = verify_attestation(&raw_attestation.attestation)?;
 
-    if derived_address != raw_attestation.address {
-        return Err(RegisterSignerError::AddressMismatch {
-            expected: raw_attestation.address,
-            got: derived_address,
-        });
+            // Derive the address from the public key.
+            let pubkey_bytes = doc
+                .public_key
+                .ok_or_else(|| RegisterSignerError::PublicKeyNotSet)?;
+
+            let derived_address = ethereum_address_from_sec1_bytes(&pubkey_bytes)
+                .ok_or_else(|| RegisterSignerError::FailedToDeriveAddress)?;
+
+            if derived_address != raw_attestation.address {
+                return Err(RegisterSignerError::AddressMismatch {
+                    expected: raw_attestation.address,
+                    got: derived_address,
+                });
+            }
+
+            verifier
+                .addSigner(raw_attestation.address)
+                .send()
+                .await?
+                .watch()
+                .await?;
+        } else {
+            tracing::warn!("No RPC URL found for chain id {chain_id}")
+        }
     }
-
-    verifier
-        .addSigner(raw_attestation.address)
-        .send()
-        .await?
-        .watch()
-        .await?;
 
     Ok(())
 }
 
 pub fn retrieve_tee_verifier_contract_address(
-    chain_id: u64,
+    deployment_path: PathBuf,
 ) -> Result<Address, RegisterSignerError> {
-    // Load the deployment from the path.
-    let deployment_path = contracts_path(chain_id);
     let deployment: Deployment = serde_json::from_reader(
         std::fs::File::open(deployment_path)
             .map_err(|_| RegisterSignerError::FailedToOpenDeploymentJson)?,
@@ -117,7 +122,7 @@ pub fn retrieve_tee_verifier_contract_address(
     Ok(deployment.sp1_tee_verifier)
 }
 
-fn contracts_path(chain_id: u64) -> PathBuf {
+pub fn contracts_path(chain_id: u64) -> PathBuf {
     const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
     let mut path = PathBuf::from(MANIFEST_DIR);
@@ -131,4 +136,48 @@ fn contracts_path(chain_id: u64) -> PathBuf {
     path.push(format!("{}.json", chain_id));
 
     path
+}
+
+fn deployment_jsons() -> HashMap<String, PathBuf> {
+    const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
+    let json = &OsStr::new("json");
+
+    let mut path = PathBuf::from(MANIFEST_DIR);
+    path = path
+        .parent()
+        .expect("Failed to get parent of manifest dir")
+        .to_path_buf();
+
+    path.push("contracts");
+    path.push("deployments");
+
+    fs::read_dir(&path)
+        .expect("Failed to read path")
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .filter(|p| p.extension() == Some(json))
+        .filter_map(|p| {
+            match p
+                .file_stem()
+                .map(|f| f.to_os_string().into_string().ok())
+                .flatten()
+            {
+                Some(file_name) => Some((file_name, p)),
+                _ => None,
+            }
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::deployment_jsons;
+
+    #[test]
+    fn test_deployment_jsons() {
+        let jsons = deployment_jsons();
+
+        assert!(jsons.contains_key("31337"));
+        assert!(jsons.contains_key("11155111"))
+    }
 }

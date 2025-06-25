@@ -16,8 +16,8 @@ use sp1_tee_host::{
     api::{TEERequest, TEEResponse},
     HostStream,
 };
+use std::convert::Infallible;
 use std::sync::Arc;
-use std::{convert::Infallible, env::consts::OS};
 use tokio::net::TcpListener;
 
 use futures::stream::{self, Stream, StreamExt};

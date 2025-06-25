@@ -93,10 +93,6 @@ pub struct ServerArgs {
     #[clap(long, default_value = "https://rpc.production.succinct.xyz/")]
     pub prover_network_url: String,
 
-    /// The RPC URL of the Ethereum network.
-    #[clap(long, env)]
-    pub rpc_url: String,
-
     /// The private key to use.
     #[clap(long, env)]
     pub private_key: String,

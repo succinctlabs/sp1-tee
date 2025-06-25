@@ -11,9 +11,6 @@ export class Sp1TeeStack extends cdk.Stack {
         const certificateArn = new cdk.CfnParameter(this, "CertificateArn", {
             type: "String",
             description: "ARN of the SSL certificate for HTTPS listener",
-            default:
-                "arn:aws:acm:us-west-1:421253708207:certificate/e2d50c31-c82b-4434-880f-0823c06c2a3d",
-            //"arn:aws:acm:us-west-1:421253708207:certificate/f961b604-7c7a-4368-9dfd-66b4b1f7f19e",
         });
 
         const vpc = new cdk.aws_ec2.Vpc(this, "SP1_TEE_VPC", {
@@ -37,9 +34,10 @@ export class Sp1TeeStack extends cdk.Stack {
             assumedBy: new cdk.aws_iam.ServicePrincipal("ec2.amazonaws.com"),
         });
 
+        // Add S3 full access policy
         role.addManagedPolicy(
             cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
-                "service-role/AmazonEC2RoleforSSM",
+                "AmazonS3FullAccess",
             ),
         );
 
@@ -194,7 +192,7 @@ export class Sp1TeeStack extends cdk.Stack {
             `SP1_TEE_AutoScalingGroup_V${version}`,
             {
                 minCapacity: 2,
-                maxCapacity: 2,
+                maxCapacity: 5,
                 launchTemplate,
                 vpc,
                 vpcSubnets: {

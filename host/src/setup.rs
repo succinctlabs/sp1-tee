@@ -66,7 +66,7 @@ pub async fn register_signer(args: &ServerArgs, port: u16) -> Result<(), Registe
 
     let wallet = EthereumWallet::new(signer);
     for (chain_id, deployment_json_path) in deployment_jsons() {
-        if let Some(rpc_url) = std::env::var(format!("RPC_URL_{chain_id}")).ok() {
+        if let Ok(rpc_url) = std::env::var(format!("RPC_URL_{chain_id}")) {
             tracing::info!("Adding signer for chain id {chain_id}");
 
             let provider = ProviderBuilder::new().wallet(wallet.clone()).connect_http(
@@ -157,14 +157,9 @@ fn deployment_jsons() -> HashMap<String, PathBuf> {
         .map(|e| e.path())
         .filter(|p| p.extension() == Some(json))
         .filter_map(|p| {
-            match p
-                .file_stem()
-                .map(|f| f.to_os_string().into_string().ok())
-                .flatten()
-            {
-                Some(file_name) => Some((file_name, p)),
-                _ => None,
-            }
+            p.file_stem()
+                .and_then(|f| f.to_os_string().into_string().ok())
+                .map(|file_name| (file_name, p))
         })
         .collect()
 }

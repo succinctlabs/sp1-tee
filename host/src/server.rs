@@ -42,7 +42,7 @@ impl Server {
         start_enclave(args);
 
         // Add the new signer
-        (|| async { crate::setup::register_signer(&args, sp1_tee_common::ENCLAVE_PORT).await })
+        (|| async { crate::setup::register_signer(args, sp1_tee_common::ENCLAVE_PORT).await })
             .retry(ExponentialBuilder::default().with_max_times(5))
             .await
             .expect("Failed to register the signer");

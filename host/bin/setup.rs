@@ -277,7 +277,7 @@ fn deploy_args<P: WalletProvider>(cmd: &mut Command, args: &Args, provider: &P) 
             &args.rpc_url,
             "--verify",
             "--etherscan-api-key",
-            &etherscan_api_key,
+            etherscan_api_key,
             "--broadcast",
             "--sender",
             &provider.default_signer_address().to_string(),

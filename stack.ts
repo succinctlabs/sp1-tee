@@ -67,44 +67,6 @@ export class Sp1TeeStack extends cdk.Stack {
 
         secret.grantRead(role);
 
-        const userData = cdk.aws_ec2.UserData.forLinux();
-
-        userData.addCommands("dnf install git aws-cli jq -y");
-        userData.addCommands("cd /home/ec2-user");
-
-        // Retrieve secrets and add them to .env file
-        userData.addCommands(
-            `SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${secret.secretArn} --region ${this.region} --query SecretString --output text)`,
-            "SEAL_URL=$(echo $SECRET_JSON | jq -r .seal_url)",
-            "SEAL_BEARER_TOKEN=$(echo $SECRET_JSON | jq -r .seal_bearer_token)",
-            "PRIVATE_KEY=$(echo $SECRET_JSON | jq -r .private_key)",
-            'echo "SEAL_BEARER_TOKEN=$SEAL_BEARER_TOKEN" >> .env',
-            'echo "SEAL_URL=$SEAL_URL" >> .env',
-            'echo "PRIVATE_KEY=$PRIVATE_KEY" >> .env',
-        );
-
-        // Add RPC URLs for all supported chains
-        CHAIN_IDS.forEach((chainId) => {
-            userData.addCommands(
-                `RPC_URL_${chainId}=$(echo $SECRET_JSON | jq -r .rpc_url_${chainId})`,
-            );
-            userData.addCommands(
-                `echo "RPC_URL_${chainId}=$RPC_URL_${chainId}" >> .env`,
-            );
-        });
-
-        // Clone the repo
-        userData.addCommands(
-            "cd /home/ec2-user",
-            "git clone https://github.com/succinctlabs/sp1-tee.git",
-            "cd sp1-tee",
-            "git checkout aurelien/automate-deployments", // TODO: Remove
-            "mv Dockerfile.enclave Dockerfile",
-            "chown -R ec2-user:ec2-user .",
-
-            "sudo -u ec2-user ./scripts/install-host.sh", // TODO: Add --production
-        );
-
         const loadBalancer =
             new cdk.aws_elasticloadbalancingv2.ApplicationLoadBalancer(
                 this,
@@ -163,9 +125,9 @@ export class Sp1TeeStack extends cdk.Stack {
 
         this.createVersionedInfrastructure(
             "1",
+            secret.secretArn,
             vpc,
             enclaveSg,
-            userData,
             role,
             httpsListener,
         );
@@ -173,12 +135,14 @@ export class Sp1TeeStack extends cdk.Stack {
 
     createVersionedInfrastructure(
         version: string,
+        secretArn: string,
         vpc: cdk.aws_ec2.Vpc,
         enclaveSg: cdk.aws_ec2.SecurityGroup,
-        userData: cdk.aws_ec2.UserData,
         role: cdk.aws_iam.Role,
         httpsListener: cdk.aws_elasticloadbalancingv2.ApplicationListener,
     ) {
+        const userData = this.buildUserData(version, secretArn);
+
         const launchTemplate = new cdk.aws_ec2.LaunchTemplate(
             this,
             `SP1_TEE_LaunchTemplate_V${version}`,
@@ -244,5 +208,48 @@ export class Sp1TeeStack extends cdk.Stack {
             ],
             priority: 100,
         });
+    }
+
+    buildUserData(version: string, secretArn: string): cdk.aws_ec2.UserData {
+        const userData = cdk.aws_ec2.UserData.forLinux();
+
+        userData.addCommands("dnf install git aws-cli jq -y");
+        userData.addCommands("cd /home/ec2-user");
+
+        // Retrieve secrets and add them to .env file
+        userData.addCommands(
+            `SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${secretArn} --region ${this.region} --query SecretString --output text)`,
+            "SEAL_URL=$(echo $SECRET_JSON | jq -r .seal_url)",
+            "SEAL_BEARER_TOKEN=$(echo $SECRET_JSON | jq -r .seal_bearer_token)",
+            "PRIVATE_KEY=$(echo $SECRET_JSON | jq -r .private_key)",
+            'echo "SEAL_BEARER_TOKEN=$SEAL_BEARER_TOKEN" >> .env',
+            'echo "SEAL_URL=$SEAL_URL" >> .env',
+            'echo "PRIVATE_KEY=$PRIVATE_KEY" >> .env',
+            `echo "ENCLAVE_VERSION=${version}" >> .env`,
+        );
+
+        // Add RPC URLs for all supported chains
+        CHAIN_IDS.forEach((chainId) => {
+            userData.addCommands(
+                `RPC_URL_${chainId}=$(echo $SECRET_JSON | jq -r .rpc_url_${chainId})`,
+            );
+            userData.addCommands(
+                `echo "RPC_URL_${chainId}=$RPC_URL_${chainId}" >> .env`,
+            );
+        });
+
+        // Clone the repo
+        userData.addCommands(
+            "cd /home/ec2-user",
+            "git clone https://github.com/succinctlabs/sp1-tee.git",
+            "cd sp1-tee",
+            "git checkout aurelien/automate-deployments", // TODO: Remove
+            "mv Dockerfile.enclave Dockerfile",
+            "chown -R ec2-user:ec2-user .",
+
+            "sudo -u ec2-user ./scripts/install-host.sh", // TODO: Add --production
+        );
+
+        return userData;
     }
 }

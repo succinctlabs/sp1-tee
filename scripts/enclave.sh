@@ -31,11 +31,16 @@ if [ $1 == "terminate" ]; then
     exit 0
 fi
 
+if [ -z "$ENCLAVE_VERSION" ]; then
+    echo "ENCLAVE_VERSION is not set, exiting..."
+    exit 1;
+fi
+
 # Always build the enclave from scratch.
 if [[ $2 == "-f" || $2 == "--debug" ]]; then
-    docker build --build-arg DEBUG_MODE=1 -t sp1-tee .
+    docker build --build-arg DEBUG_MODE=1 ENCLAVE_VERSION=$ENCLAVE_VERSION -t sp1-tee .
 else
-    docker build -t sp1-tee .
+    docker build --build-arg ENCLAVE_VERSION=$ENCLAVE_VERSION -t sp1-tee .
 fi
 
 # Create the EIF from the enclave.

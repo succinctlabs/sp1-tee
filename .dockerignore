@@ -1,3 +1,9 @@
-target
-Dockerfile
-tmp
+# Ignore everything
+*
+
+# Allow files and directories
+!/enclave
+!/host
+!/common
+!/scripts/install-guest.sh
+!/Cargo.toml

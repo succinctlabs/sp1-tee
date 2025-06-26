@@ -96,6 +96,10 @@ pub struct ServerArgs {
     /// The private key to use.
     #[clap(long, env)]
     pub private_key: String,
+
+    /// The enclave version.
+    #[clap(long, env)]
+    pub enclave_version: u8,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -220,6 +224,7 @@ pub fn start_enclave(args: &ServerArgs) {
     command.env("ENCLAVE_CID", args.enclave_cid.to_string());
     command.env("ENCLAVE_CPU_COUNT", args.enclave_cores.to_string());
     command.env("ENCLAVE_MEMORY", args.enclave_memory.to_string());
+    command.env("ENCLAVE_VERSION", args.enclave_version.to_string());
 
     // Pipe the output to the parent process.
     command.stdout(std::process::Stdio::inherit());

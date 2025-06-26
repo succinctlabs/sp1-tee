@@ -1,5 +1,5 @@
 [workspace]
-members = ["host", "enclave/server", "common"]
+members = ["server", "common"]
 resolver = "2"
 
 [workspace.package]
@@ -8,8 +8,7 @@ edition = "2021"
 
 [workspace.dependencies]
 # Workspace crates
-sp1-tee-enclave = { path = "./enclave/server" }
-sp1-tee-host = { path = "./host" }
+sp1-tee-enclave = { path = "./server" }
 sp1-tee-common = { path = "./common" }
 
 # Shared dependencies
@@ -27,9 +26,5 @@ tracing = "0.1.41"
 # Alerts
 alert-subscriber = { git = "https://github.com/succinctlabs/alert-subscriber.git", branch = "main" }
 
-sp1-sdk = { version = "5.0.0" }
-sp1-prover = { version = "5.0.0" }
-
-# [patch.crates-io]
-# sp1-sdk = { path = "../sp1/crates/sdk" }
-# sp1-prover = { path = "../sp1/crates/prover" }
+sp1-sdk = { version = "4.1.5" }
+sp1-prover = { version = "4.1.5" }

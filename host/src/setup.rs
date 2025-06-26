@@ -65,6 +65,25 @@ pub async fn register_signer(args: &ServerArgs, port: u16) -> Result<(), Registe
         .map_err(|_| RegisterSignerError::FailedToParsePrivateKey)?;
 
     let wallet = EthereumWallet::new(signer);
+
+    let raw_attestation = retrieve_attestation_from_enclave(args.enclave_cid, port).await?;
+    let doc = verify_attestation(&raw_attestation.attestation)?;
+
+    // Derive the address from the public key.
+    let pubkey_bytes = doc
+        .public_key
+        .ok_or_else(|| RegisterSignerError::PublicKeyNotSet)?;
+
+    let derived_address = ethereum_address_from_sec1_bytes(&pubkey_bytes)
+        .ok_or_else(|| RegisterSignerError::FailedToDeriveAddress)?;
+
+    if derived_address != raw_attestation.address {
+        return Err(RegisterSignerError::AddressMismatch {
+            expected: raw_attestation.address,
+            got: derived_address,
+        });
+    }
+
     for (chain_id, deployment_json_path) in deployment_jsons() {
         if let Ok(rpc_url) = std::env::var(format!("RPC_URL_{chain_id}")) {
             tracing::info!("Adding signer for chain id {chain_id}");
@@ -78,23 +97,6 @@ pub async fn register_signer(args: &ServerArgs, port: u16) -> Result<(), Registe
                 retrieve_tee_verifier_contract_address(deployment_json_path)?;
 
             let verifier = TEEVerifier::new(sp1_tee_verifier_address, provider);
-            let raw_attestation = retrieve_attestation_from_enclave(args.enclave_cid, port).await?;
-            let doc = verify_attestation(&raw_attestation.attestation)?;
-
-            // Derive the address from the public key.
-            let pubkey_bytes = doc
-                .public_key
-                .ok_or_else(|| RegisterSignerError::PublicKeyNotSet)?;
-
-            let derived_address = ethereum_address_from_sec1_bytes(&pubkey_bytes)
-                .ok_or_else(|| RegisterSignerError::FailedToDeriveAddress)?;
-
-            if derived_address != raw_attestation.address {
-                return Err(RegisterSignerError::AddressMismatch {
-                    expected: raw_attestation.address,
-                    got: derived_address,
-                });
-            }
 
             verifier
                 .addSigner(raw_attestation.address)

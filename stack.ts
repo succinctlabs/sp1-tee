@@ -4,7 +4,11 @@ import * as route53 from "aws-cdk-lib/aws-route53";
 import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import { Construct } from "constructs";
 
+// All supported chains
 const CHAIN_IDS = [11155111];
+
+// All supported versions
+const VERSIONS = ["1", "2"];
 
 export class Sp1TeeStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -123,14 +127,16 @@ export class Sp1TeeStack extends cdk.Stack {
             },
         );
 
-        this.createVersionedInfrastructure(
-            "1",
-            secret.secretArn,
-            vpc,
-            enclaveSg,
-            role,
-            httpsListener,
-        );
+        VERSIONS.forEach((v) => {
+            this.createVersionedInfrastructure(
+                v,
+                secret.secretArn,
+                vpc,
+                enclaveSg,
+                role,
+                httpsListener,
+            );
+        });
     }
 
     createVersionedInfrastructure(

@@ -2,13 +2,17 @@ import * as cdk from "aws-cdk-lib";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
+import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
+import * as sns from "aws-cdk-lib/aws-sns";
+import * as snsSubscriptions from "aws-cdk-lib/aws-sns-subscriptions";
+import * as actions from "aws-cdk-lib/aws-cloudwatch-actions";
 import { Construct } from "constructs";
 
 // All supported chains
 const CHAIN_IDS = [11155111];
 
 // All supported versions
-const VERSIONS = ["1", "2"];
+const VERSIONS = [1, 2];
 
 export class Sp1TeeStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -18,6 +22,30 @@ export class Sp1TeeStack extends cdk.Stack {
             type: "String",
             description: "ARN of the SSL certificate for HTTPS listener",
         });
+
+        const pagerDutyWebhookUrl = new cdk.CfnParameter(
+            this,
+            "PagerDutyWebhookUrl",
+            {
+                type: "String",
+                description: "PagerDuty webhook URL",
+            },
+        );
+
+        const alertsTopic = new sns.Topic(this, "SP1_TEE_HealthAlerts", {
+            displayName: "SP1 TEE Health Alerts",
+            topicName: "sp1-tee-health-alerts",
+        });
+
+        alertsTopic.addSubscription(
+            new snsSubscriptions.UrlSubscription(
+                pagerDutyWebhookUrl.valueAsString,
+                {
+                    protocol: sns.SubscriptionProtocol.HTTPS,
+                    rawMessageDelivery: true,
+                },
+            ),
+        );
 
         const vpc = new cdk.aws_ec2.Vpc(this, "SP1_TEE_VPC", {
             natGateways: 1,
@@ -131,6 +159,7 @@ export class Sp1TeeStack extends cdk.Stack {
             this.createVersionedInfrastructure(
                 v,
                 secret.secretArn,
+                alertsTopic,
                 vpc,
                 enclaveSg,
                 role,
@@ -140,8 +169,9 @@ export class Sp1TeeStack extends cdk.Stack {
     }
 
     createVersionedInfrastructure(
-        version: string,
+        version: number,
         secretArn: string,
+        alertsTopic: cdk.aws_sns.Topic,
         vpc: cdk.aws_ec2.Vpc,
         enclaveSg: cdk.aws_ec2.SecurityGroup,
         role: cdk.aws_iam.Role,
@@ -209,14 +239,16 @@ export class Sp1TeeStack extends cdk.Stack {
             conditions: [
                 cdk.aws_elasticloadbalancingv2.ListenerCondition.httpHeader(
                     "X-SP1-TEE-Version",
-                    [version],
+                    [version.toString()],
                 ),
             ],
-            priority: 100,
+            priority: 99 + version,
         });
+
+        this.createHealthAlarms(version, targetGroup, alertsTopic);
     }
 
-    buildUserData(version: string, secretArn: string): cdk.aws_ec2.UserData {
+    buildUserData(version: number, secretArn: string): cdk.aws_ec2.UserData {
         const userData = cdk.aws_ec2.UserData.forLinux();
 
         userData.addCommands("dnf install git aws-cli jq -y");
@@ -257,5 +289,36 @@ export class Sp1TeeStack extends cdk.Stack {
         );
 
         return userData;
+    }
+
+    createHealthAlarms(
+        version: number,
+        targetGroup: cdk.aws_elasticloadbalancingv2.ApplicationTargetGroup,
+        alertsTopic: cdk.aws_sns.Topic,
+    ) {
+        // Alarm for unhealthy targets
+        let unhealthyTargetsAlarm = new cloudwatch.Alarm(
+            this,
+            `SP1_TEE_UnhealthyTargets_V${version}_Alarm`,
+            {
+                metric: targetGroup.metrics.unhealthyHostCount({
+                    period: cdk.Duration.seconds(30),
+                    statistic: "Average",
+                }),
+                threshold: 1,
+                comparisonOperator:
+                    cloudwatch.ComparisonOperator
+                        .GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                evaluationPeriods: 2,
+                treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+                alarmDescription: `SP1 TEE Version ${version} has unhealthy targets`,
+                alarmName: `SP1-TEE-UnhealthyTargets-V${version}`,
+            },
+        );
+
+        const snsAction = new actions.SnsAction(alertsTopic);
+
+        unhealthyTargetsAlarm.addAlarmAction(snsAction);
+        unhealthyTargetsAlarm.addOkAction(snsAction);
     }
 }

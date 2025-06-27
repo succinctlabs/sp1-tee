@@ -26,5 +26,7 @@ tracing = "0.1.41"
 # Alerts
 alert-subscriber = { git = "https://github.com/succinctlabs/alert-subscriber.git", branch = "main" }
 
+# TODO: This is temporary for demonstration purpose
+# The version below need to be updated with a SP1 version with SP1_TEE_VERSION = 2
 sp1-sdk = { version = "5.0.5" }
 sp1-prover = { version = "5.0.5" }

@@ -44,9 +44,6 @@ else
     cargo install --path host --bin sp1-tee-server
 
     sudo systemctl enable --now tee-service.service
-
-    #echo "In order to start the tee-service automatically, you must pass the --production flag."
-    #echo "To start the debug mode server: cargo run --bin sp1-tee-server -- --debug"
 fi
 
 echo "You will need to add ENV vars to use alerting, the default path for this is ~/.env"

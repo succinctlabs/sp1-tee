@@ -153,8 +153,7 @@ impl Server {
                     Err(e) => {
                         stream
                             .send(EnclaveResponse::Error(format!(
-                                "Join error when attesting signing key: {:?}",
-                                e
+                                "Join error when attesting signing key: {e:?}"
                             )))
                             .await
                             .unwrap();
@@ -175,8 +174,7 @@ impl Server {
                     Err(e) => {
                         stream
                             .send(EnclaveResponse::Error(format!(
-                                "Join error when executing program: {}",
-                                e
+                                "Join error when executing program: {e}"
                             )))
                             .await
                             .unwrap();
@@ -261,8 +259,7 @@ impl Server {
     fn execute(&self, stdin: SP1Stdin, program: Vec<u8>, cycle_limit: u64) -> EnclaveResponse {
         if cycle_limit > MAX_ALLOWED_CYCLES {
             return EnclaveResponse::Error(format!(
-                "Cycle limit is too high: {}, max: {}",
-                cycle_limit, MAX_ALLOWED_CYCLES
+                "Cycle limit is too high: {cycle_limit}, max: {MAX_ALLOWED_CYCLES}"
             ));
         }
 
@@ -318,7 +315,7 @@ impl Server {
                     recovery_id: recovery_id.into(),
                 }
             }
-            Err(e) => EnclaveResponse::Error(format!("Failed to execute program: {:?}", e)),
+            Err(e) => EnclaveResponse::Error(format!("Failed to execute program: {e:?}")),
         }
     }
 }

@@ -52,7 +52,7 @@ async fn main() {
                 .await
                 .unwrap();
 
-            println!("Validated signer: {:?}", signer);
+            println!("Validated signer: {signer:?}");
         }
         Command::Contract {
             contract,
@@ -76,17 +76,14 @@ async fn main() {
                 .await
                 {
                     Ok(_) => {
-                        println!("Validated signer: {:?}", signer);
+                        println!("Validated signer: {signer:?}");
                     }
                     // It is expected that some signers will not be for the given version.
                     Err(AttestationVerificationError::VersionMismatch(_, _)) => {
-                        println!(
-                            "Signer: {:?}, not for version {}, skipping...",
-                            signer, version
-                        );
+                        println!("Signer: {signer:?}, not for version {version}, skipping...");
                     }
                     Err(e) => {
-                        panic!("Failed to validate signer {}: {:?}", signer, e);
+                        panic!("Failed to validate signer {signer}: {e:?}");
                     }
                 }
             }

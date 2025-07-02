@@ -159,7 +159,7 @@ async fn main() {
     let deployment_path = contracts_path(chain_id);
     let sp1_tee_verifier = retrieve_tee_verifier_contract_address(deployment_path).unwrap();
 
-    println!("Deployed Verifier: {:?}", sp1_tee_verifier);
+    println!("Deployed Verifier: {sp1_tee_verifier:?}");
 
     ///////////////////////////////
     // Add the signers
@@ -181,10 +181,7 @@ async fn main() {
         let doc = match sp1_tee_host::attestations::verify_attestation(&attestation) {
             Ok(doc) => doc,
             Err(e) => {
-                eprintln!(
-                    "Failed to verify attestation for address: {:?}, error: {:?}",
-                    address, e
-                );
+                eprintln!("Failed to verify attestation for address: {address:?}, error: {e:?}");
                 eprintln!("Its possible this can happen if an enclave goes down, and the expiry period has not been reached yet.");
                 continue;
             }
@@ -212,10 +209,7 @@ async fn main() {
             .expect("Failed to derive address from public key");
 
         if derived_address != address {
-            panic!(
-                "Address mismatch expected: {:?}, got: {:?}",
-                address, derived_address
-            );
+            panic!("Address mismatch expected: {address:?}, got: {derived_address:?}");
         }
 
         // Check if the signer is already registered.
@@ -239,9 +233,9 @@ async fn main() {
                 .await
                 .expect("Failed to get confirmation of adding signer");
 
-            println!("Added signer: {:?}", address);
+            println!("Added signer: {address:?}");
         } else {
-            println!("Found valid signer: {:?}", address);
+            println!("Found valid signer: {address:?}");
         }
     }
 
@@ -263,10 +257,7 @@ fn deploy_args<P: WalletProvider>(cmd: &mut Command, args: &Args, provider: &P) 
         .as_ref()
         .expect("The verifier gateway is required when deploying");
 
-    println!(
-        "Deploying contracts with verifier gateway: {}",
-        verifier_gateway
-    );
+    println!("Deploying contracts with verifier gateway: {verifier_gateway}");
 
     // NOTE: Private key is overriden on the `Args` type, so we don't check the env here.
     cmd.env("SP1_VERIFIER_GATEWAY", verifier_gateway.to_string())

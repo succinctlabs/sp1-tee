@@ -172,27 +172,27 @@ impl IntoResponse for ServerError {
             ServerError::EnclaveError(e) => (StatusCode::INTERNAL_SERVER_ERROR, e),
             ServerError::StdinTooLarge(size) => (
                 StatusCode::PAYLOAD_TOO_LARGE,
-                format!("Stdin is too large, found {} bytes", size),
+                format!("Stdin is too large, found {size} bytes"),
             ),
             ServerError::ProgramTooLarge(size) => (
                 StatusCode::PAYLOAD_TOO_LARGE,
-                format!("Program is too large, found {} bytes", size),
+                format!("Program is too large, found {size} bytes"),
             ),
             ServerError::FailedToDeserializeRequest(e) => (
                 StatusCode::BAD_REQUEST,
-                format!("Failed to deserialize request, {}", e),
+                format!("Failed to deserialize request, {e}"),
             ),
             ServerError::FailedToParseEnclaveMeasurement(e) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to parse enclave measurement, {}", e),
+                format!("Failed to parse enclave measurement, {e}"),
             ),
             ServerError::IoError(e) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Io error when fetching enclave measurement, {}", e),
+                format!("Io error when fetching enclave measurement, {e}"),
             ),
             ServerError::FailedToGetAttestations(e) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to get attestations, {}", e),
+                format!("Failed to get attestations, {e}"),
             ),
             #[cfg(feature = "production")]
             ServerError::FailedToAuthenticateRequest => (

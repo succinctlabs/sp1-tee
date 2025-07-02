@@ -135,7 +135,7 @@ pub fn contracts_path(chain_id: u64) -> PathBuf {
 
     path.push("contracts");
     path.push("deployments");
-    path.push(format!("{}.json", chain_id));
+    path.push(format!("{chain_id}.json"));
 
     path
 }

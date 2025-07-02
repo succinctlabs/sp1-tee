@@ -224,7 +224,7 @@ pub fn start_enclave(args: &ServerArgs) {
     command.env("ENCLAVE_CID", args.enclave_cid.to_string());
     command.env("ENCLAVE_CPU_COUNT", args.enclave_cores.to_string());
     command.env("ENCLAVE_MEMORY", args.enclave_memory.to_string());
-    command.env("ENCLAVE_VERSION", args.enclave_version.to_string());
+    command.env("ENCLAVE_TAG", format!("v{}", args.enclave_version));
 
     // Pipe the output to the parent process.
     command.stdout(std::process::Stdio::inherit());

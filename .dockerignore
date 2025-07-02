@@ -7,3 +7,5 @@
 !/common
 !/scripts/install-guest.sh
 !/Cargo.toml
+!/Cargo.lock
+!/rust-toolchain.toml

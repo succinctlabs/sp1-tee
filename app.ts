@@ -1,20 +1,31 @@
 #!/usr/bin/env node
 import * as cdk from "aws-cdk-lib";
-import { Sp1TeeStack } from "./stack";
+import { Sp1TeeBaseStack } from "./cdk/base";
+import { Sp1TeeVersionedStack } from "./cdk/versioned";
 
 const app = new cdk.App();
-new Sp1TeeStack(app, "Sp1TeeStack", {
+const enclaveVersion = parseInt(process.env.ENCLAVE_VERSION_NUMBER || "");
+
+if (isNaN(enclaveVersion)) {
+    throw "Please provide a valid ENCLAVE_VERSION_NUMBER env variable";
+}
+
+const base = new Sp1TeeBaseStack(app, "Sp1TeeBaseStack", {
     /* If you don't specify 'env', this stack will be environment-agnostic.
      * Account/Region-dependent features and context lookups will not work,
      * but a single synthesized template can be deployed anywhere. */
+    env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: "us-west-1" },
+});
 
-    /* Uncomment the next line to specialize this stack for the AWS Account
-     * and Region that are implied by the current CLI configuration. */
+new Sp1TeeVersionedStack(app, `Sp1TeeV${enclaveVersion}Stack`, {
     env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: "us-west-1" },
 
-    /* Uncomment the next line if you know exactly what Account and Region you
-     * want to deploy the stack to. */
-    // env: { account: '123456789012', region: 'us-east-1' },
-
-    /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
+    version: enclaveVersion,
+    vpc: base.vpc,
+    enclaveSg: base.enclaveSg,
+    loadBalancer: base.loadBalancer,
+    httpsListener: base.httpsListener,
+    role: base.role,
+    secret: base.secret,
+    alertsTopic: base.alertsTopic
 });

@@ -18,8 +18,8 @@ jobs:
             - name: Retrieve the tag
               run: |
                   # echo "RELEASE_TAG=`git describe --tags --exact-match 2> /dev/null`" >> $GITHUB_ENV
-                  echo "ENCLAVE_VERSION=v1" >> $GITHUB_ENV
                   echo "RELEASE_TAG=v1" >> $GITHUB_ENV
+                  echo "SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-7`" >> $GITHUB_ENV
 
             - name: Checkout repo
               uses: actions/checkout@v4
@@ -50,13 +50,13 @@ jobs:
                   file: ./Dockerfile.enclave
                   push: false
                   load: true
-                  tags: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.RELEASE_TAG }}
+                  tags: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.RELEASE_TAG }}-${{ env.SHORT_SHA }}
                   cache-from: type=gha
                   cache-to: type=gha, mode=max
 
             - name: Push Docker image to Amazon ECR Public
               run: |
-                  docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.RELEASE_TAG }}
+                  docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.RELEASE_TAG }}-${{ env.SHORT_SHA }}
     deploy:
         needs: docker-build-push
         runs-on:
@@ -70,8 +70,8 @@ jobs:
             - name: Retrieve the tag
               run: |
                   # echo "RELEASE_TAG=`git describe --tags --exact-match 2> /dev/null`" >> $GITHUB_ENV
-                  echo "ENCLAVE_VERSION=1" >> $GITHUB_ENV
                   echo "RELEASE_TAG=v1" >> $GITHUB_ENV
+                  echo "SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-7`" >> $GITHUB_ENV
 
             - name: Checkout repo
               uses: actions/checkout@v4
@@ -111,5 +111,5 @@ jobs:
 
             - name: Deploy Versioned Stack
               run: |
-                  cdk deploy Sp1TeeV${{ env.ENCLAVE_VERSION }}Stack \
+                  cdk deploy Sp1TeeVersionedStack-${{ env.RELEASE_TAG }} \
                     --require-approval never

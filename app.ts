@@ -4,14 +4,11 @@ import { Sp1TeeBaseStack } from "./cdk/base";
 import { Sp1TeeVersionedStack } from "./cdk/versioned";
 
 const app = new cdk.App();
-let enclaveVersion;
+const releaseTag = process.env.RELEASE_TAG;
+const commit = process.env.SHORT_SHA || "";
 
-if (process.env.ENCLAVE_VERSION) {
-    enclaveVersion = parseInt(process.env.ENCLAVE_VERSION.substring(1));
-}
-
-if (!enclaveVersion || isNaN(enclaveVersion)) {
-    throw "Please provide a valid ENCLAVE_VERSION env variable";
+if (!releaseTag) {
+    throw "Please provide a valid RELEASE_TAG env variable";
 }
 
 const base = new Sp1TeeBaseStack(app, "Sp1TeeBaseStack", {
@@ -21,10 +18,11 @@ const base = new Sp1TeeBaseStack(app, "Sp1TeeBaseStack", {
     env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: "us-west-1" },
 });
 
-new Sp1TeeVersionedStack(app, `Sp1TeeV${enclaveVersion}Stack`, {
+new Sp1TeeVersionedStack(app, `Sp1TeeVersionedStack-${releaseTag}`, {
     env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: "us-west-1" },
 
-    version: enclaveVersion,
+    releaseTag,
+    commit,
     vpc: base.vpc,
     enclaveSg: base.enclaveSg,
     loadBalancer: base.loadBalancer,

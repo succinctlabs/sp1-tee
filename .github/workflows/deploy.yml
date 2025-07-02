@@ -70,7 +70,7 @@ jobs:
             - name: Retrieve the tag
               run: |
                   # echo "RELEASE_TAG=`git describe --tags --exact-match 2> /dev/null`" >> $GITHUB_ENV
-                  echo "ENCLAVE_VERSION=v1" >> $GITHUB_ENV
+                  echo "ENCLAVE_VERSION=1" >> $GITHUB_ENV
                   echo "RELEASE_TAG=v1" >> $GITHUB_ENV
 
             - name: Checkout repo

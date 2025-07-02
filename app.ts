@@ -4,10 +4,14 @@ import { Sp1TeeBaseStack } from "./cdk/base";
 import { Sp1TeeVersionedStack } from "./cdk/versioned";
 
 const app = new cdk.App();
-const enclaveVersion = parseInt(process.env.ENCLAVE_VERSION_NUMBER || "");
+let enclaveVersion;
 
-if (isNaN(enclaveVersion)) {
-    throw "Please provide a valid ENCLAVE_VERSION_NUMBER env variable";
+if (process.env.ENCLAVE_VERSION) {
+    enclaveVersion = parseInt(process.env.ENCLAVE_VERSION.substring(1));
+}
+
+if (!enclaveVersion || isNaN(enclaveVersion)) {
+    throw "Please provide a valid ENCLAVE_VERSION env variable";
 }
 
 const base = new Sp1TeeBaseStack(app, "Sp1TeeBaseStack", {
@@ -27,5 +31,5 @@ new Sp1TeeVersionedStack(app, `Sp1TeeV${enclaveVersion}Stack`, {
     httpsListener: base.httpsListener,
     role: base.role,
     secret: base.secret,
-    alertsTopic: base.alertsTopic
+    alertsTopic: base.alertsTopic,
 });

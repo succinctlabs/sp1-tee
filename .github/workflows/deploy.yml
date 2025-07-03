@@ -49,7 +49,7 @@ jobs:
               uses: docker/build-push-action@v6
               with:
                   context: .
-                  file: ./Dockerfile.enclave
+                  file: ./Dockerfile
                   push: false
                   load: true
                   tags: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.RELEASE_TAG }}-${{ env.SHORT_SHA }}

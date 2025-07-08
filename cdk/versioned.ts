@@ -2,8 +2,10 @@ import * as cdk from "aws-cdk-lib";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as actions from "aws-cdk-lib/aws-cloudwatch-actions";
 import { Construct } from "constructs";
+import { Environment } from "./base";
 
-export interface Sp1TeeVersionedkProps extends cdk.StackProps {
+export interface Sp1TeeVersionedProps extends cdk.StackProps {
+    environment: Environment;
     releaseTag: string;
     commit: string;
     vpc: cdk.aws_ec2.Vpc;
@@ -19,7 +21,7 @@ export interface Sp1TeeVersionedkProps extends cdk.StackProps {
 const CHAIN_IDS = [11155111];
 
 export class Sp1TeeVersionedStack extends cdk.Stack {
-    constructor(scope: Construct, id: string, props: Sp1TeeVersionedkProps) {
+    constructor(scope: Construct, id: string, props: Sp1TeeVersionedProps) {
         super(scope, id, props);
 
         const version = parseInt(props.releaseTag.substring(1));
@@ -32,7 +34,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
 
         const launchTemplate = new cdk.aws_ec2.LaunchTemplate(
             this,
-            `SP1_TEE_LaunchTemplate_${props.releaseTag}`,
+            `SP1_TEE${props.environment}_LaunchTemplate_${props.releaseTag}`,
             {
                 instanceType: new cdk.aws_ec2.InstanceType("m5a.4xlarge"),
                 machineImage: cdk.aws_ec2.MachineImage.latestAmazonLinux2023(),
@@ -54,7 +56,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
 
         const asg = new cdk.aws_autoscaling.AutoScalingGroup(
             this,
-            `SP1_TEE_AutoScalingGroup_${props.releaseTag}`,
+            `SP1_TEE${props.environment}_AutoScalingGroup_${props.releaseTag}`,
             {
                 minCapacity: 2,
                 maxCapacity: 5,
@@ -70,7 +72,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
         const targetGroup =
             new cdk.aws_elasticloadbalancingv2.ApplicationTargetGroup(
                 this,
-                `SP1_TEE_TargetGroup_${props.releaseTag}`,
+                `SP1_TEE${props.environment}_TargetGroup_${props.releaseTag}`,
                 {
                     targets: [asg],
                     protocol:
@@ -87,7 +89,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
 
         new cdk.aws_elasticloadbalancingv2.ApplicationListenerRule(
             this,
-            `SP1_TEE_${props.releaseTag}_Rule`,
+            `SP1_TEE${props.environment}_Rule_${props.releaseTag}`,
             {
                 listener: props.httpsListener,
                 targetGroups: [targetGroup],
@@ -102,6 +104,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
         );
 
         this.createHealthAlarms(
+            props.environment,
             props.releaseTag,
             targetGroup,
             props.alertsTopic,
@@ -148,13 +151,14 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
             "git checkout aurelien/automate-deployments", // TODO: Remove
             "chown -R ec2-user:ec2-user .",
 
-            "sudo -u ec2-user ./scripts/install-host.sh", // TODO: Add --production
+            "sudo -u ec2-user ./scripts/install-host.sh" + this.environment == Environment.Prod ? " --production" : "",
         );
 
         return userData;
     }
 
     createHealthAlarms(
+        environment: Environment,
         releaseTag: string,
         targetGroup: cdk.aws_elasticloadbalancingv2.ApplicationTargetGroup,
         alertsTopic: cdk.aws_sns.Topic,
@@ -162,7 +166,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
         // Alarm for unhealthy targets
         let unhealthyTargetsAlarm = new cloudwatch.Alarm(
             this,
-            `SP1_TEE_UnhealthyTargets_${releaseTag}_Alarm`,
+            `SP1_TEE_UnhealthyTargets${environment}_Alarm_${releaseTag}`,
             {
                 metric: targetGroup.metrics.unhealthyHostCount({
                     period: cdk.Duration.seconds(30),

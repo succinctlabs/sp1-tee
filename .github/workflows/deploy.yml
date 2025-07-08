@@ -2,7 +2,7 @@ name: Deploy a stack
 on:
     push:
         tags:
-            - "v[0-9]+"
+            - "v[0-9]+(-staging)"
 
 env:
     ECR_REGISTRY: public.ecr.aws
@@ -103,12 +103,13 @@ jobs:
             - name: Install AWS CDK
               run: pnpm install -g aws-cdk
 
-            - name: Deploy Base Stack
-              run: |
-                  cdk deploy Sp1TeeBaseStack \
-                    --parameters CertificateArn=${{ secrets.CERTIFICATE_ARN }} \
-                    --parameters PagerDutyWebhookUrl=${{ secrets.PAGERDUTY_WEBHOOK_URL }} \
-                    --require-approval never
+            - name: Deploy Prod Base Stack
+              if: ${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'staging') }}
+              run: cdk deploy Sp1TeeBaseStack --require-approval never
+
+            - name: Deploy Staging Base Stack
+              if: ${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'staging') }}
+              run: cdk deploy Sp1TeeBaseStack_STAGING --require-approval never
 
             - name: Deploy Versioned Stack
               run: |

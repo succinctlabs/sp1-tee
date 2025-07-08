@@ -6,6 +6,19 @@ import * as sns from "aws-cdk-lib/aws-sns";
 import * as snsSubscriptions from "aws-cdk-lib/aws-sns-subscriptions";
 import { Construct } from "constructs";
 
+export interface Sp1TeeBaseProps extends cdk.StackProps {
+    environment: Environment;
+    certificateArn: string | undefined;
+    hostedZoneId: string | undefined;
+    zoneName: string;
+    pagerDutyWebhookUrl: string | undefined;
+}
+
+export enum Environment {
+  Staging = "_STAGING",
+  Prod = ""
+}
+
 export class Sp1TeeBaseStack extends cdk.Stack {
     public readonly vpc: cdk.aws_ec2.Vpc;
     public readonly loadBalancer: cdk.aws_elasticloadbalancingv2.ApplicationLoadBalancer;
@@ -15,35 +28,26 @@ export class Sp1TeeBaseStack extends cdk.Stack {
     public readonly secret: cdk.aws_secretsmanager.ISecret;
     public readonly alertsTopic: cdk.aws_sns.Topic;
 
-    constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+    constructor(scope: Construct, id: string, props: Sp1TeeBaseProps) {
         super(scope, id, props);
 
-        const certificateArn = new cdk.CfnParameter(this, "CertificateArn", {
-            type: "String",
-            description: "ARN of the SSL certificate for HTTPS listener",
-        });
+        if (!props.certificateArn) {
+            throw `The CERIFICATE_ARN${props.environment} env variable is required`;
+        }
 
-        /*
-        const pagerDutyWebhookUrl = new cdk.CfnParameter(
-            this,
-            "PagerDutyWebhookUrl",
-            {
-                type: "String",
-                description: "PagerDuty webhook URL",
-            },
-        );
-         */
+        if (!props.hostedZoneId) {
+            throw `The HOSTED_ZONE_ID${props.environment} env variable is required`;
+        }
 
-        this.alertsTopic = new sns.Topic(this, "SP1_TEE_HealthAlerts", {
+        this.alertsTopic = new sns.Topic(this, `SP1_TEE${props.environment}_HealthAlerts`, {
             displayName: "SP1 TEE Health Alerts",
             topicName: "sp1-tee-health-alerts",
         });
 
-        /*
-        if (pagerDutyWebhookUrl.valueAsString) {
+        if (props.pagerDutyWebhookUrl) {
             this.alertsTopic.addSubscription(
                 new snsSubscriptions.UrlSubscription(
-                    pagerDutyWebhookUrl.valueAsString,
+                    props.pagerDutyWebhookUrl,
                     {
                         protocol: sns.SubscriptionProtocol.HTTPS,
                         rawMessageDelivery: true,
@@ -51,9 +55,8 @@ export class Sp1TeeBaseStack extends cdk.Stack {
                 ),
             );
         }
-         */
 
-        this.vpc = new cdk.aws_ec2.Vpc(this, "SP1_TEE_VPC", {
+        this.vpc = new cdk.aws_ec2.Vpc(this, `SP1_TEE${props.environment}_VPC`, {
             natGateways: 1,
             enableDnsSupport: true,
             enableDnsHostnames: true,
@@ -70,7 +73,7 @@ export class Sp1TeeBaseStack extends cdk.Stack {
         });
 
         // Instance Role and SSM Managed Policy
-        this.role = new cdk.aws_iam.Role(this, "SP1_TEE_InstanceSSM", {
+        this.role = new cdk.aws_iam.Role(this, `SP1_TEE${props.environment}_InstanceSSM`, {
             assumedBy: new cdk.aws_iam.ServicePrincipal("ec2.amazonaws.com"),
         });
 
@@ -83,7 +86,7 @@ export class Sp1TeeBaseStack extends cdk.Stack {
 
         this.enclaveSg = new cdk.aws_ec2.SecurityGroup(
             this,
-            "SP1_TEE_SecurityGroup",
+            `SP1_TEE${props.environment}_SecurityGroup`,
             {
                 vpc: this.vpc,
                 allowAllOutbound: true,
@@ -99,7 +102,7 @@ export class Sp1TeeBaseStack extends cdk.Stack {
 
         this.secret = cdk.aws_secretsmanager.Secret.fromSecretNameV2(
             this,
-            "SP1_TEE_Secret",
+            `SP1_TEE${props.environment}_Secret`,
             "sp1_tee",
         );
 
@@ -108,7 +111,7 @@ export class Sp1TeeBaseStack extends cdk.Stack {
         this.loadBalancer =
             new cdk.aws_elasticloadbalancingv2.ApplicationLoadBalancer(
                 this,
-                "SP1_TEE_ApplicationLoadBalancer",
+                `SP1_TEE${props.environment}_ApplicationLoadBalancer`,
                 {
                     vpc: this.vpc,
                     vpcSubnets: {
@@ -120,15 +123,15 @@ export class Sp1TeeBaseStack extends cdk.Stack {
 
         const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
             this,
-            "SP1_TEE_HostedZone",
+            `SP1_TEE${props.environment}_HostedZone`,
             {
-                hostedZoneId: "Z07931692VMB8INXEKFYF", // TODO: Update
-                zoneName: "succinct.tools",
+                hostedZoneId: props.hostedZoneId,
+                zoneName: props.zoneName,
             },
         );
 
         // Create A record (alias) pointing domain to load balancer
-        new route53.ARecord(this, "SP1_TEE_ARecord", {
+        new route53.ARecord(this, `SP1_TEE${props.environment}_ARecord`, {
             zone: hostedZone,
             recordName: "tee",
             target: route53.RecordTarget.fromAlias(
@@ -139,12 +142,12 @@ export class Sp1TeeBaseStack extends cdk.Stack {
 
         const certificate = acm.Certificate.fromCertificateArn(
             this,
-            "SP1_TEE_Certificate",
-            certificateArn.valueAsString,
+            `SP1_TEE${props.environment}_Certificate`,
+            props.certificateArn,
         );
 
         this.httpsListener = this.loadBalancer.addListener(
-            "SP1_TEE_ApplicationLoadBalancer_HTTPSListener",
+            `SP1_TEE${props.environment}_ApplicationLoadBalancer_HTTPSListener`,
             {
                 port: 443,
                 defaultAction:

@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import * as cdk from "aws-cdk-lib";
-import { Sp1TeeBaseStack, Environment, Sp1TeeBaseProps } from "./cdk/base";
+import { Sp1TeeBaseStack, Environment } from "./cdk/base";
 import { Sp1TeeVersionedStack } from "./cdk/versioned";
-import { ReleaseLabel } from "aws-cdk-lib/aws-stepfunctions-tasks";
 
 const app = new cdk.App();
 const releaseTag = process.env.RELEASE_TAG;

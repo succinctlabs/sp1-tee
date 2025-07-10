@@ -15,7 +15,7 @@ export interface Sp1TeeBaseProps extends cdk.StackProps {
 }
 
 export enum Environment {
-  Staging = "_STAGING",
+  Staging = "-staging",
   Prod = ""
 }
 
@@ -32,14 +32,14 @@ export class Sp1TeeBaseStack extends cdk.Stack {
         super(scope, id, props);
 
         if (!props.certificateArn) {
-            throw `The CERIFICATE_ARN${props.environment} env variable is required`;
+            throw `The CERIFICATE_ARN env variable is required`;
         }
 
         if (!props.hostedZoneId) {
-            throw `The HOSTED_ZONE_ID${props.environment} env variable is required`;
+            throw `The HOSTED_ZONE_ID env variable is required`;
         }
 
-        this.alertsTopic = new sns.Topic(this, `SP1_TEE${props.environment}_HealthAlerts`, {
+        this.alertsTopic = new sns.Topic(this, `SP1_TEE_HealthAlerts${props.environment}`, {
             displayName: "SP1 TEE Health Alerts",
             topicName: "sp1-tee-health-alerts",
         });
@@ -56,7 +56,7 @@ export class Sp1TeeBaseStack extends cdk.Stack {
             );
         }
 
-        this.vpc = new cdk.aws_ec2.Vpc(this, `SP1_TEE${props.environment}_VPC`, {
+        this.vpc = new cdk.aws_ec2.Vpc(this, `SP1_TEE_VPC${props.environment}`, {
             natGateways: 1,
             enableDnsSupport: true,
             enableDnsHostnames: true,
@@ -73,7 +73,7 @@ export class Sp1TeeBaseStack extends cdk.Stack {
         });
 
         // Instance Role and SSM Managed Policy
-        this.role = new cdk.aws_iam.Role(this, `SP1_TEE${props.environment}_InstanceSSM`, {
+        this.role = new cdk.aws_iam.Role(this, `SP1_TEE_InstanceSSM${props.environment}`, {
             assumedBy: new cdk.aws_iam.ServicePrincipal("ec2.amazonaws.com"),
         });
 
@@ -86,7 +86,7 @@ export class Sp1TeeBaseStack extends cdk.Stack {
 
         this.enclaveSg = new cdk.aws_ec2.SecurityGroup(
             this,
-            `SP1_TEE${props.environment}_SecurityGroup`,
+            `SP1_TEE_SecurityGroup${props.environment}`,
             {
                 vpc: this.vpc,
                 allowAllOutbound: true,
@@ -102,7 +102,7 @@ export class Sp1TeeBaseStack extends cdk.Stack {
 
         this.secret = cdk.aws_secretsmanager.Secret.fromSecretNameV2(
             this,
-            `SP1_TEE${props.environment}_Secret`,
+            `SP1_TEE_Secret${props.environment}`,
             "sp1_tee",
         );
 
@@ -111,7 +111,7 @@ export class Sp1TeeBaseStack extends cdk.Stack {
         this.loadBalancer =
             new cdk.aws_elasticloadbalancingv2.ApplicationLoadBalancer(
                 this,
-                `SP1_TEE${props.environment}_ApplicationLoadBalancer`,
+                `SP1_TEE_ApplicationLoadBalance${props.environment}`,
                 {
                     vpc: this.vpc,
                     vpcSubnets: {
@@ -123,7 +123,7 @@ export class Sp1TeeBaseStack extends cdk.Stack {
 
         const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
             this,
-            `SP1_TEE${props.environment}_HostedZone`,
+            `SP1_TEE_HostedZone${props.environment}`,
             {
                 hostedZoneId: props.hostedZoneId,
                 zoneName: props.zoneName,
@@ -131,7 +131,7 @@ export class Sp1TeeBaseStack extends cdk.Stack {
         );
 
         // Create A record (alias) pointing domain to load balancer
-        new route53.ARecord(this, `SP1_TEE${props.environment}_ARecord`, {
+        new route53.ARecord(this, `SP1_TEE_ARecord${props.environment}`, {
             zone: hostedZone,
             recordName: "tee",
             target: route53.RecordTarget.fromAlias(
@@ -142,12 +142,12 @@ export class Sp1TeeBaseStack extends cdk.Stack {
 
         const certificate = acm.Certificate.fromCertificateArn(
             this,
-            `SP1_TEE${props.environment}_Certificate`,
+            `SP1_TEE_Certificate${props.environment}`,
             props.certificateArn,
         );
 
         this.httpsListener = this.loadBalancer.addListener(
-            `SP1_TEE${props.environment}_ApplicationLoadBalancer_HTTPSListener`,
+            `SP1_TEE_ApplicationLoadBalancer_HTTPSListener${props.environment}`,
             {
                 port: 443,
                 defaultAction:

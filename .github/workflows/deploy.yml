@@ -78,11 +78,15 @@ jobs:
                       echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_STAGING }}" >> $GITHUB_ENV
                       echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_STAGING }}" >> $GITHUB_ENV
                       echo "AWS_REGION=${{ secrets.AWS_REGION_STAGING }}" >> $GITHUB_ENV
+                      echo "CERTIFICATE_ARN=${{ secrets.CERTIFICATE_ARN_STAGING }}" >> $GITHUB_ENV
+                      echo "HOSTED_ZONE_ID=${{ secrets.HOSTED_ZONE_ID_STAGING }}" >> $GITHUB_ENV
                   else
                       echo "environment=prod" >> $GITHUB_OUTPUT
                       echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
                       echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
                       echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> $GITHUB_ENV
+                      echo "CERTIFICATE_ARN=${{ secrets.CERTIFICATE_ARN_STAGING }}" >> $GITHUB_ENV
+                      echo "HOSTED_ZONE_ID=${{ secrets.HOSTED_ZONE_ID_STAGING }}" >> $GITHUB_ENV
                   fi
                   echo "RELEASE_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
                   echo "SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-7`" >> $GITHUB_ENV
@@ -119,7 +123,7 @@ jobs:
             - name: Deploy Base Stack
               run: |
                   if [ "${{ steps.env.outputs.environment }}" = "staging" ]; then
-                    cdk deploy Sp1TeeBaseStack_STAGING --require-approval never
+                    cdk deploy Sp1TeeBaseStack-staging --require-approval never
                   else
                     cdk deploy Sp1TeeBaseStack --require-approval never
                   fi               

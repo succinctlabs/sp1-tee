@@ -33,8 +33,8 @@ switch(environment) {
         props = {
             env:{ account: process.env.CDK_DEFAULT_ACCOUNT, region: "us-west-1" },
             environment,
-            certificateArn: process.env.CERTIFICATE_ARN_STAGING,
-            hostedZoneId: process.env.HOSTED_ZONE_ID_STAGING,
+            certificateArn: process.env.CERTIFICATE_ARN,
+            hostedZoneId: process.env.HOSTED_ZONE_ID,
             zoneName: "succinct.tools",
             pagerDutyWebhookUrl: undefined,
         }
@@ -47,7 +47,6 @@ const base = new Sp1TeeBaseStack(app, `Sp1TeeBaseStack${environment}`, props);
 new Sp1TeeVersionedStack(app, `Sp1TeeVersionedStack-${releaseTag}`, {
     env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: "us-west-1" },
 
-    environment,
     releaseTag,
     commit,
     vpc: base.vpc,

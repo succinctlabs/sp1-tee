@@ -119,14 +119,11 @@ jobs:
             - name: Deploy Base Stack
               run: |
                   if [ "${{ steps.env.outputs.environment }}" = "staging" ]; then
-                    # cdk deploy Sp1TeeBaseStack_STAGING --require-approval never
-                    echo "Deploy Base Staging"
+                    cdk deploy Sp1TeeBaseStack_STAGING --require-approval never
                   else
-                    # cdk deploy Sp1TeeBaseStack --require-approval never
-                    echo "Deploy Base Prod"
+                    cdk deploy Sp1TeeBaseStack --require-approval never
                   fi               
 
             - name: Deploy Versioned Stack
               run: |
-                  # cdk deploy Sp1TeeVersionedStack-${{ env.RELEASE_TAG }} --require-approval never
-                  echo "Deploy Versioned ${{ env.RELEASE_TAG }}"
+                  cdk deploy Sp1TeeVersionedStack-${{ env.RELEASE_TAG }} --require-approval never

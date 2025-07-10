@@ -149,7 +149,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
             "git checkout aurelien/automate-deployments", // TODO: Remove
             "chown -R ec2-user:ec2-user .",
 
-            "sudo -u ec2-user ./scripts/install-host.sh" + this.environment == Environment.Prod ? " --production" : "",
+            "sudo -u ec2-user ./scripts/install-host.sh" + (this.environment == Environment.Prod ? " --production" : ""),
         );
 
         return userData;

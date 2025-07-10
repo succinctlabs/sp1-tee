@@ -69,8 +69,20 @@ jobs:
                 "spot=false",
             ]
         steps:
-            - name: Retrieve the tag
+            - name: Retrieve the env variables
+              id: env
               run: |
+                  if [[ ${{ github.ref_name }} == *staging* ]]; then
+                      echo "environment=staging" >> $GITHUB_OUTPUT
+                      echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_STAGING }}" >> $GITHUB_ENV
+                      echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_STAGING }}" >> $GITHUB_ENV
+                      echo "AWS_REGION=${{ secrets.AWS_REGION_STAGING }}" >> $GITHUB_ENV
+                  else
+                      echo "environment=prod" >> $GITHUB_OUTPUT
+                      echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+                      echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+                      echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> $GITHUB_ENV
+                  fi
                   echo "RELEASE_TAG=`git describe --tags --exact-match 2> /dev/null`" >> $GITHUB_ENV
                   echo "SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-7`" >> $GITHUB_ENV
 
@@ -82,9 +94,9 @@ jobs:
             - name: Configure AWS credentials
               uses: "aws-actions/configure-aws-credentials@v1"
               with:
-                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                  aws-region: ${{ secrets.AWS_REGION }}
+                  aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: ${{ env.AWS_REGION }}
 
             - name: Install pnpm
               uses: pnpm/action-setup@v4
@@ -103,15 +115,17 @@ jobs:
             - name: Install AWS CDK
               run: pnpm install -g aws-cdk
 
-            - name: Deploy Prod Base Stack
-              if: ${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'staging') }}
-              run: cdk deploy Sp1TeeBaseStack --require-approval never
-
-            - name: Deploy Staging Base Stack
-              if: ${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'staging') }}
-              run: cdk deploy Sp1TeeBaseStack_STAGING --require-approval never
+            - name: Deploy Base Stack
+              run: |
+                  if [ "${{ steps.env.outputs.environment }}" = "staging" ]; then
+                    # cdk deploy Sp1TeeBaseStack_STAGING --require-approval never
+                    echo "Deploy Base Staging"
+                  else
+                    # cdk deploy Sp1TeeBaseStack --require-approval never
+                    echo "Deploy Base Prod"
+                  fi               
 
             - name: Deploy Versioned Stack
               run: |
-                  cdk deploy Sp1TeeVersionedStack-${{ env.RELEASE_TAG }} \
-                    --require-approval never
+                  # cdk deploy Sp1TeeVersionedStack-${{ env.RELEASE_TAG }} --require-approval never
+                  echo "Deploy Versioned ${{ env.RELEASE_TAG }}"

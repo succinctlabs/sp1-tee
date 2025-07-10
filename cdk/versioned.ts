@@ -146,7 +146,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
             "cd /home/ec2-user",
             "git clone https://github.com/succinctlabs/sp1-tee.git",
             "cd sp1-tee",
-            "git checkout aurelien/automate-deployments", // TODO: Remove
+            `git checkout ${releaseTag}`,
             "chown -R ec2-user:ec2-user .",
 
             "sudo -u ec2-user ./scripts/install-host.sh" + (this.environment == Environment.Prod ? " --production" : ""),

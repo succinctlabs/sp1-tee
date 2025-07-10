@@ -2,7 +2,8 @@ name: Deploy a stack
 on:
     push:
         tags:
-            - "v[0-9]+(-staging)"
+            - "v[0-9]+"
+            - "v[0-9]+-staging"
 
 env:
     ECR_REGISTRY: public.ecr.aws

@@ -42,7 +42,7 @@ switch(environment) {
         break;
 }
 
-const base = new Sp1TeeBaseStack(app, `Sp1TeeBaseStack$${environment}`, props);
+const base = new Sp1TeeBaseStack(app, `Sp1TeeBaseStack${environment}`, props);
 
 new Sp1TeeVersionedStack(app, `Sp1TeeVersionedStack-${releaseTag}`, {
     env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: "us-west-1" },

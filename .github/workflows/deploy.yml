@@ -21,7 +21,7 @@ jobs:
         steps:
             - name: Retrieve the tag
               run: |
-                  echo "RELEASE_TAG=`git describe --tags --exact-match 2> /dev/null`" >> $GITHUB_ENV
+                  echo "RELEASE_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
                   echo "SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-7`" >> $GITHUB_ENV
 
             - name: Checkout repo
@@ -84,7 +84,7 @@ jobs:
                       echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
                       echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> $GITHUB_ENV
                   fi
-                  echo "RELEASE_TAG=`git describe --tags --exact-match 2> /dev/null`" >> $GITHUB_ENV
+                  echo "RELEASE_TAG=`${{ github.ref_name }}" >> $GITHUB_ENV
                   echo "SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-7`" >> $GITHUB_ENV
 
             - name: Checkout repo

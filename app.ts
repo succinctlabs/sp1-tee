@@ -19,7 +19,7 @@ let props = undefined;
 switch(environment) {
     case Environment.Prod:
         props = {
-            env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
+            env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.AWS_REGION },
             environment,
             certificateArn: process.env.CERTIFICATE_ARN,
             hostedZoneId: process.env.HOSTED_ZONE_ID,

@@ -2,7 +2,6 @@
 use auth::AuthClient;
 
 use axum::{http::StatusCode, response::IntoResponse, response::Response};
-use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
 use serde::Deserialize;
 use std::{path::Path, sync::Arc, time::Duration};
@@ -42,10 +41,11 @@ impl Server {
         start_enclave(args);
 
         // Add the new signer
-        (|| async { crate::setup::register_signer(args, sp1_tee_common::ENCLAVE_PORT).await })
-            .retry(ExponentialBuilder::default().with_max_times(5))
-            .await
-            .expect("Failed to register the signer");
+        // The signer is added manually for now
+        // (|| async { crate::setup::register_signer(args, sp1_tee_common::ENCLAVE_PORT).await })
+        //     .retry(ExponentialBuilder::default().with_max_times(5))
+        //     .await
+        //     .expect("Failed to register the signer");
 
         // Spawn a task to save attestations to S3.
         spawn_attestation_task(
@@ -94,7 +94,7 @@ pub struct ServerArgs {
     pub prover_network_url: String,
 
     /// The private key to use.
-    #[clap(long, env)]
+    #[clap(long, env, default_value = "0x0")]
     pub private_key: String,
 
     /// The enclave version.

@@ -31,7 +31,7 @@ switch(environment) {
     
     case Environment.Staging:
         props = {
-            env:{ account: process.env.CDK_DEFAULT_ACCOUNT, region: "us-west-1" },
+            env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: "us-west-1" },
             environment,
             certificateArn: process.env.CERTIFICATE_ARN,
             hostedZoneId: process.env.HOSTED_ZONE_ID,
@@ -45,7 +45,7 @@ switch(environment) {
 const base = new Sp1TeeBaseStack(app, `Sp1TeeBaseStack${environment}`, props);
 
 new Sp1TeeVersionedStack(app, `Sp1TeeVersionedStack-${releaseTag}`, {
-    env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: "us-west-1" },
+    env: { account: props.env.account, region: props.env.region },
 
     releaseTag,
     commit,

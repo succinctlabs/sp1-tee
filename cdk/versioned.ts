@@ -5,6 +5,7 @@ import { Construct } from "constructs";
 import { Environment } from "./base";
 
 export interface Sp1TeeVersionedProps extends cdk.StackProps {
+    environment: Environment;
     releaseTag: string;
     commit: string;
     vpc: cdk.aws_ec2.Vpc;
@@ -26,6 +27,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
         const version = parseInt(props.releaseTag.substring(1));
 
         const userData = this.buildUserData(
+            props.environment,
             props.releaseTag,
             props.commit,
             props.secret.secretArn,
@@ -110,6 +112,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
     }
 
     buildUserData(
+        environment: Environment,
         releaseTag: string,
         commit: string,
         secretArn: string,
@@ -149,7 +152,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
             `git checkout ${releaseTag}`,
             "chown -R ec2-user:ec2-user .",
 
-            "sudo -u ec2-user ./scripts/install-host.sh" + (this.environment == Environment.Prod ? " --production" : ""),
+            "sudo -u ec2-user ./scripts/install-host.sh" + (environment == Environment.Prod ? " --production" : ""),
         );
 
         return userData;

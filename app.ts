@@ -47,6 +47,7 @@ const base = new Sp1TeeBaseStack(app, `Sp1TeeBaseStack${environment}`, props);
 new Sp1TeeVersionedStack(app, `Sp1TeeVersionedStack-${releaseTag}`, {
     env: { account: props.env.account, region: props.env.region },
 
+    environment,
     releaseTag,
     commit,
     vpc: base.vpc,

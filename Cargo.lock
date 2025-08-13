@@ -87,7 +87,7 @@ dependencies = [
 [[package]]
 name = "alert-subscriber"
 version = "0.1.0"
-source = "git+https://github.com/succinctlabs/alert-subscriber.git?branch=main#89b4bc2ea4509a240b57ed96fb758615c0a42f8e"
+source = "git+https://github.com/succinctlabs/alert-subscriber.git?branch=main#0d1810406ec9134d4f7ddb80538dfa4a11ea0e72"
 dependencies = [
  "parking_lot",
  "reqwest",
@@ -1921,7 +1921,7 @@ dependencies = [
  "bitflags 2.8.0",
  "cexpr",
  "clang-sys",
- "itertools 0.12.1",
+ "itertools 0.10.5",
  "lazy_static",
  "lazycell",
  "log",
@@ -4132,7 +4132,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]

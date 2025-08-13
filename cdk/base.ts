@@ -133,7 +133,7 @@ export class Sp1TeeBaseStack extends cdk.Stack {
         // Create A record (alias) pointing domain to load balancer
         new route53.ARecord(this, `SP1_TEE_ARecord${props.environment}`, {
             zone: hostedZone,
-            recordName: "tee",
+            recordName: "tee2", // TODO: Revert
             target: route53.RecordTarget.fromAlias(
                 new route53Targets.LoadBalancerTarget(this.loadBalancer),
             ),

@@ -32,7 +32,7 @@ export class Sp1TeeBaseStack extends cdk.Stack {
         super(scope, id, props);
 
         if (!props.certificateArn) {
-            throw `The CERIFICATE_ARN env variable is required`;
+            throw `The CERTIFICATE_ARN env variable is required`;
         }
 
         if (!props.hostedZoneId) {
@@ -131,9 +131,31 @@ export class Sp1TeeBaseStack extends cdk.Stack {
         );
 
         // Create A record (alias) pointing domain to load balancer
-        new route53.ARecord(this, `SP1_TEE_ARecord${props.environment}`, {
+        //new route53.ARecord(this, `SP1_TEE_ARecord${props.environment}`, {
+        //    zone: hostedZone,
+        //    recordName: "tee",
+        //    target: route53.RecordTarget.fromAlias(
+        //        new route53Targets.LoadBalancerTarget(this.loadBalancer),
+        //    ),
+        //    ttl: undefined, // TTL is automatically set for alias records
+        //});
+
+        // Use L1 CfnRecordSet to avoid CDK trying to “helpfully” change it.
+        const teeExisting = new route53.CfnRecordSet(this, `SP1_TEE_ARecord${props.environment}`, {
+        hostedZoneId: hostedZone.hostedZoneId,
+        name: 'tee.production.succinct.xyz.',
+        type: 'A',
+        aliasTarget: {
+            dnsName: 'sp1-tee-3c935ba4577b3332.elb.us-east-2.amazonaws.com.',
+            hostedZoneId: 'Z00830391MP1GXOFI9R00', 
+            evaluateTargetHealth: false,
+        },
+        });
+
+        // TODO: Remove
+        new route53.ARecord(this, `SP1_TEE_ARecord${props.environment}_tee2`, {
             zone: hostedZone,
-            recordName: "tee2", // TODO: Revert
+            recordName: "tee2", 
             target: route53.RecordTarget.fromAlias(
                 new route53Targets.LoadBalancerTarget(this.loadBalancer),
             ),

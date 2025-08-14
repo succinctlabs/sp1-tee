@@ -46,7 +46,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
                 blockDevices: [
                     {
                         deviceName: "/dev/xvda",
-                        volume: cdk.aws_ec2.BlockDeviceVolume.ebs(50, {
+                        volume: cdk.aws_ec2.BlockDeviceVolume.ebs(500, {
                             volumeType: cdk.aws_ec2.EbsDeviceVolumeType.GP3,
                             deleteOnTermination: true,
                         }),

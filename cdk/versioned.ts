@@ -132,6 +132,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
             'echo "SEAL_URL=$SEAL_URL" >> .env',
             'echo "PRIVATE_KEY=$PRIVATE_KEY" >> .env',
             `echo "ENCLAVE_TAG=${releaseTag}-${commit}" >> .env`,
+            'echo "DISABLE_ALERTS=1" >> .env', // TODO: Remove
         );
 
         // Add RPC URLs for all supported chains

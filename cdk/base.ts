@@ -15,8 +15,8 @@ export interface Sp1TeeBaseProps extends cdk.StackProps {
 }
 
 export enum Environment {
-  Staging = "-staging",
-  Prod = ""
+    Staging = "-staging",
+    Prod = "",
 }
 
 export class Sp1TeeBaseStack extends cdk.Stack {
@@ -39,10 +39,14 @@ export class Sp1TeeBaseStack extends cdk.Stack {
             throw `The HOSTED_ZONE_ID env variable is required`;
         }
 
-        this.alertsTopic = new sns.Topic(this, `SP1_TEE_HealthAlerts${props.environment}`, {
-            displayName: "SP1 TEE Health Alerts",
-            topicName: "sp1-tee-health-alerts",
-        });
+        this.alertsTopic = new sns.Topic(
+            this,
+            `SP1_TEE_HealthAlerts${props.environment}`,
+            {
+                displayName: "SP1 TEE Health Alerts",
+                topicName: "sp1-tee-health-alerts",
+            },
+        );
 
         if (props.pagerDutyWebhookUrl) {
             this.alertsTopic.addSubscription(
@@ -56,31 +60,48 @@ export class Sp1TeeBaseStack extends cdk.Stack {
             );
         }
 
-        this.vpc = new cdk.aws_ec2.Vpc(this, `SP1_TEE_VPC${props.environment}`, {
-            natGateways: 1,
-            enableDnsSupport: true,
-            enableDnsHostnames: true,
-            subnetConfiguration: [
-                {
-                    name: "public",
-                    subnetType: cdk.aws_ec2.SubnetType.PUBLIC,
-                },
-                {
-                    name: "private",
-                    subnetType: cdk.aws_ec2.SubnetType.PRIVATE_WITH_EGRESS,
-                },
-            ],
-        });
+        this.vpc = new cdk.aws_ec2.Vpc(
+            this,
+            `SP1_TEE_VPC${props.environment}`,
+            {
+                natGateways: 1,
+                enableDnsSupport: true,
+                enableDnsHostnames: true,
+                subnetConfiguration: [
+                    {
+                        name: "public",
+                        subnetType: cdk.aws_ec2.SubnetType.PUBLIC,
+                    },
+                    {
+                        name: "private",
+                        subnetType: cdk.aws_ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                    },
+                ],
+            },
+        );
 
         // Instance Role and SSM Managed Policy
-        this.role = new cdk.aws_iam.Role(this, `SP1_TEE_InstanceSSM${props.environment}`, {
-            assumedBy: new cdk.aws_iam.ServicePrincipal("ec2.amazonaws.com"),
-        });
+        this.role = new cdk.aws_iam.Role(
+            this,
+            `SP1_TEE_InstanceSSM${props.environment}`,
+            {
+                assumedBy: new cdk.aws_iam.ServicePrincipal(
+                    "ec2.amazonaws.com",
+                ),
+            },
+        );
 
         // Add S3 full access policy
         this.role.addManagedPolicy(
             cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
                 "AmazonS3FullAccess",
+            ),
+        );
+
+        // Add SSM managed policy for Session Manager
+        this.role.addManagedPolicy(
+            cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
+                "AmazonSSMManagedInstanceCore",
             ),
         );
 
@@ -133,7 +154,7 @@ export class Sp1TeeBaseStack extends cdk.Stack {
         // Create A record (alias) pointing domain to load balancer
         new route53.ARecord(this, `SP1_TEE_ARecord${props.environment}`, {
             zone: hostedZone,
-            recordName: "tee2", 
+            recordName: "tee2",
             target: route53.RecordTarget.fromAlias(
                 new route53Targets.LoadBalancerTarget(this.loadBalancer),
             ),

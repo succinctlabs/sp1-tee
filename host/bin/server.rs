@@ -26,6 +26,10 @@ use futures::stream::{self, Stream, StreamExt};
 async fn main() {
     dotenv::dotenv().ok();
 
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .unwrap();
+
     sp1_tee_host::init_tracing();
 
     let args = ServerArgs::parse();

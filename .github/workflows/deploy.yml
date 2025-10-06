@@ -1,0 +1,133 @@
+name: Deploy a stack
+on:
+    push:
+        tags:
+            - "v[0-9]+"
+            - "v[0-9]+-staging"
+
+env:
+    ECR_REGISTRY: public.ecr.aws
+    ECR_REPOSITORY: succinct-labs/sp1-tee-enclave
+
+jobs:
+    docker-build-push:
+        runs-on:
+            [
+                "runs-on",
+                "runner=32cpu-linux-x64",
+                "run-id=${{ github.run_id }}",
+                "spot=false",
+            ]
+        steps:
+            - name: Retrieve the tag
+              run: |
+                  echo "RELEASE_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
+                  echo "SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-7`" >> $GITHUB_ENV
+
+            - name: Checkout repo
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  submodules: "true"
+
+            - name: Configure AWS credentials
+              uses: "aws-actions/configure-aws-credentials@v1"
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: us-east-1
+
+            - name: Set up Docker
+              uses: docker/setup-buildx-action@v3
+
+            - name: Login to Amazon ECR Public
+              id: login-ecr-public
+              uses: aws-actions/amazon-ecr-login@v2
+              with:
+                  registry-type: public
+
+            - name: Build Docker image
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: ./Dockerfile
+                  push: false
+                  load: true
+                  tags: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.RELEASE_TAG }}-${{ env.SHORT_SHA }}
+                  cache-from: type=gha
+                  cache-to: type=gha, mode=max
+
+            - name: Push Docker image to Amazon ECR Public
+              run: |
+                  docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.RELEASE_TAG }}-${{ env.SHORT_SHA }}
+    deploy:
+        needs: docker-build-push
+        runs-on:
+            [
+                "runs-on",
+                "runner=32cpu-linux-x64",
+                "run-id=${{ github.run_id }}",
+                "spot=false",
+            ]
+        steps:
+            - name: Retrieve the env variables
+              id: env
+              run: |
+                  if [[ ${{ github.ref_name }} == *staging* ]]; then
+                      echo "environment=staging" >> $GITHUB_OUTPUT
+                      echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_STAGING }}" >> $GITHUB_ENV
+                      echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_STAGING }}" >> $GITHUB_ENV
+                      echo "AWS_REGION=${{ secrets.AWS_REGION_STAGING }}" >> $GITHUB_ENV
+                      echo "CERTIFICATE_ARN=${{ secrets.CERTIFICATE_ARN_STAGING }}" >> $GITHUB_ENV
+                      echo "HOSTED_ZONE_ID=${{ secrets.HOSTED_ZONE_ID_STAGING }}" >> $GITHUB_ENV
+                  else
+                      echo "environment=prod" >> $GITHUB_OUTPUT
+                      echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+                      echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+                      echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> $GITHUB_ENV
+                      echo "CERTIFICATE_ARN=${{ secrets.CERTIFICATE_ARN }}" >> $GITHUB_ENV
+                      echo "HOSTED_ZONE_ID=${{ secrets.HOSTED_ZONE_ID }}" >> $GITHUB_ENV
+                  fi
+                  echo "RELEASE_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
+                  echo "SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-7`" >> $GITHUB_ENV
+
+            - name: Checkout repo
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Configure AWS credentials
+              uses: "aws-actions/configure-aws-credentials@v1"
+              with:
+                  aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: ${{ env.AWS_REGION }}
+
+            - name: Install pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 10
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: "pnpm"
+
+            - name: Install dependencies
+              run: pnpm install
+
+            - name: Install AWS CDK
+              run: pnpm install -g aws-cdk
+
+            - name: Deploy Base Stack
+              run: |
+                  if [ "${{ steps.env.outputs.environment }}" = "staging" ]; then
+                    cdk deploy Sp1TeeBaseStack-staging --require-approval never
+                  else
+                    cdk deploy Sp1TeeBaseStack --require-approval never
+                  fi               
+
+            - name: Deploy Versioned Stack
+              run: |
+                  cdk deploy Sp1TeeVersionedStack-${{ env.RELEASE_TAG }} --require-approval never

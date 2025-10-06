@@ -1,6 +1,6 @@
 use alloy::primitives::Address;
-use sp1_sdk::network::proto::network::{
-    prover_network_client::ProverNetworkClient, GetTeeWhitelistStatusRequest,
+use sp1_sdk::network::proto::{
+    network::prover_network_client::ProverNetworkClient, types::GetTeeWhitelistStatusRequest,
 };
 use std::time::Duration;
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint, Error};

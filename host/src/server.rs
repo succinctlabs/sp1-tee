@@ -6,6 +6,8 @@ use clap::Parser;
 use serde::Deserialize;
 use std::{path::Path, sync::Arc, time::Duration};
 
+use crate::SaveAttestationError;
+
 pub mod stream;
 
 #[cfg(feature = "production")]
@@ -27,7 +29,7 @@ impl Server {
     /// Create a new server.
     ///
     /// This function will block and start the enclave and spawn a task to save attestations to S3.
-    pub fn new(args: &ServerArgs) -> Arc<Self> {
+    pub async fn new(args: &ServerArgs) -> Arc<Self> {
         #[cfg(feature = "production")]
         {
             if args.debug {
@@ -37,6 +39,13 @@ impl Server {
 
         // Blocking start the enclave.
         start_enclave(args);
+
+        // Add the new signer
+        // The signer is added manually for now
+        // (|| async { crate::setup::register_signer(args, sp1_tee_common::ENCLAVE_PORT).await })
+        //     .retry(ExponentialBuilder::default().with_max_times(5))
+        //     .await
+        //     .expect("Failed to register the signer");
 
         // Spawn a task to save attestations to S3.
         spawn_attestation_task(
@@ -83,6 +92,14 @@ pub struct ServerArgs {
     /// The RPC URL of the prover network.
     #[clap(long, default_value = "https://rpc.production.succinct.xyz/")]
     pub prover_network_url: String,
+
+    /// The private key to use.
+    #[clap(long, env, default_value = "0x0")]
+    pub private_key: String,
+
+    /// The enclave version.
+    #[clap(long, env)]
+    pub enclave_tag: String,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -155,27 +172,27 @@ impl IntoResponse for ServerError {
             ServerError::EnclaveError(e) => (StatusCode::INTERNAL_SERVER_ERROR, e),
             ServerError::StdinTooLarge(size) => (
                 StatusCode::PAYLOAD_TOO_LARGE,
-                format!("Stdin is too large, found {} bytes", size),
+                format!("Stdin is too large, found {size} bytes"),
             ),
             ServerError::ProgramTooLarge(size) => (
                 StatusCode::PAYLOAD_TOO_LARGE,
-                format!("Program is too large, found {} bytes", size),
+                format!("Program is too large, found {size} bytes"),
             ),
             ServerError::FailedToDeserializeRequest(e) => (
                 StatusCode::BAD_REQUEST,
-                format!("Failed to deserialize request, {}", e),
+                format!("Failed to deserialize request, {e}"),
             ),
             ServerError::FailedToParseEnclaveMeasurement(e) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to parse enclave measurement, {}", e),
+                format!("Failed to parse enclave measurement, {e}"),
             ),
             ServerError::IoError(e) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Io error when fetching enclave measurement, {}", e),
+                format!("Io error when fetching enclave measurement, {e}"),
             ),
             ServerError::FailedToGetAttestations(e) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to get attestations, {}", e),
+                format!("Failed to get attestations, {e}"),
             ),
             #[cfg(feature = "production")]
             ServerError::FailedToAuthenticateRequest => (
@@ -207,6 +224,7 @@ pub fn start_enclave(args: &ServerArgs) {
     command.env("ENCLAVE_CID", args.enclave_cid.to_string());
     command.env("ENCLAVE_CPU_COUNT", args.enclave_cores.to_string());
     command.env("ENCLAVE_MEMORY", args.enclave_memory.to_string());
+    command.env("ENCLAVE_TAG", args.enclave_tag.clone());
 
     // Pipe the output to the parent process.
     command.stdout(std::process::Stdio::inherit());
@@ -297,14 +315,7 @@ pub fn spawn_attestation_task(cid: u32, port: u16, interval: Duration) {
         let mut interval = tokio::time::interval(interval);
 
         loop {
-            if let Err(e) =
-                crate::attestations::save_attestation(crate::attestations::SaveAttestationArgs {
-                    cid,
-                    port,
-                    ..Default::default()
-                })
-                .await
-            {
+            if let Err(e) = save_attestation(cid, port).await {
                 tracing::error!("Failed to save attestation: {}", e);
 
                 tokio::time::sleep(TRY_AGAIN_INTERVAL).await;
@@ -314,4 +325,15 @@ pub fn spawn_attestation_task(cid: u32, port: u16, interval: Duration) {
             interval.tick().await;
         }
     });
+}
+
+async fn save_attestation(cid: u32, port: u16) -> Result<(), SaveAttestationError> {
+    let bucket = crate::S3_BUCKET.to_string();
+
+    tracing::debug!(cid, port, bucket, "Save attestation");
+
+    let raw_attestation = crate::attestations::retrieve_attestation_from_enclave(cid, port).await?;
+    crate::attestations::save_attestation(raw_attestation, bucket).await?;
+
+    Ok(())
 }

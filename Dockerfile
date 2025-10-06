@@ -28,10 +28,10 @@ COPY . ./
 RUN cmake --version
 
 RUN if [ "${DEBUG_MODE}" -eq "1" ]; then \
-        cargo build --release --bin sp1-tee-enclave --features debug-mode; \
+        cargo build --release --bin sp1-tee-enclave --features debug-mode,enclave; \
     else \
         # Use --locked to ensure the build is reproducible.
-        cargo build --release --bin sp1-tee-enclave --locked; \
+        cargo build --release --bin sp1-tee-enclave --locked --features enclave; \
     fi
 
 # ---- Runtime Stage ----

@@ -30,4 +30,5 @@ sha3 = "0.10.8"
 cmake = "0.1"
 
 [features]
+enclave = []
 debug-mode = []

@@ -20,7 +20,7 @@ sudo systemctl enable --now docker
 curl https://sh.rustup.rs -sSf | sh -s -- -y
 
 # Source the cargo env.
-source $HOME/.cargo/env
+source ~/.cargo/env
 
 # Initialize the submodules.
 git submodule update --init --recursive
@@ -36,13 +36,15 @@ sudo cp tee-service.template.service /etc/systemd/system/tee-service.service
 
 # Enable and start the tee-service if the --production flag is passed.
 if [ "$1" = "--production" ]; then
+    echo "Installing sp1-tee-server for production use"
     # Install the tee server binary.
     cargo install --path host --bin sp1-tee-server --features production
-    
+
     sudo systemctl enable --now tee-service.service
-else 
-    echo "In order to start the tee-service automatically, you must pass the --production flag."
-    echo "To start the debug mode server: cargo run --bin sp1-tee-server -- --debug"
+else
+    cargo install --path host --bin sp1-tee-server
+
+    sudo systemctl enable --now tee-service.service
 fi
 
 echo "You will need to add ENV vars to use alerting, the default path for this is ~/.env"

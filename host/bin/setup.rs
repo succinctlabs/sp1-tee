@@ -1,20 +1,19 @@
 //! Deploy the SP1 TEE contracts.
 //!
 //! Otherwise, it will just try to add signers to the existing contracts.
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use alloy::network::EthereumWallet;
 use alloy::primitives::Address;
 use alloy::providers::{Provider, ProviderBuilder, WalletProvider};
 use alloy::signers::local::PrivateKeySigner;
-use serde::Deserialize;
 
 use clap::Parser;
 
 use sp1_tee_host::attestations::RawAttestation;
 use sp1_tee_host::contract::TEEVerifier;
 use sp1_tee_host::ethereum_address_from_sec1_bytes;
+use sp1_tee_host::setup::{contracts_path, retrieve_tee_verifier_contract_address};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -37,6 +36,7 @@ struct Args {
     /// The RPC_URL to use, if anvil modes uses the default anvil port.
     #[clap(
         long,
+        env,
         required(false),
         default_value_if("anvil", "true", "http://localhost:8545")
     )]
@@ -49,13 +49,14 @@ struct Args {
     /// ENV VAR: `PRIVATE_KEY`
     #[clap(
         long,
+        env,
         default_value_if(
             "anvil",
             "true",
             "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
         )
     )]
-    private_key: Option<String>,
+    private_key: String,
 
     /// The etherscan API key to use.
     ///
@@ -94,14 +95,10 @@ struct Args {
     verifier_gateway: Option<Address>,
 }
 
-#[derive(Debug, Deserialize)]
-struct Deployment {
-    #[serde(rename = "SP1TeeVerifier")]
-    sp1_tee_verifier: Address,
-}
-
 #[tokio::main]
 async fn main() {
+    dotenv::dotenv().ok();
+
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .init();
@@ -110,11 +107,10 @@ async fn main() {
     // Global args.
     ///////////////////////////////
 
-    let mut args = Args::parse();
+    let args = Args::parse();
 
-    let pk = unwrap_or_env(&args.private_key, "PRIVATE_KEY");
-
-    let signer = pk
+    let signer = args
+        .private_key
         .parse::<PrivateKeySigner>()
         .expect("Invalid private key provided");
     let wallet = EthereumWallet::new(signer);
@@ -122,11 +118,6 @@ async fn main() {
     let provider = ProviderBuilder::new()
         .wallet(wallet)
         .connect_http(args.rpc_url.parse().expect("Failed to parse RPC url"));
-
-    // This can only be reached iff `deploy` is true & the pk was taken from the env.
-    if args.private_key.is_none() {
-        args.private_key = Some(pk.clone());
-    }
 
     ///////////////////////////////
     // Deploy the contracts.
@@ -165,14 +156,10 @@ async fn main() {
         .await
         .expect("Failed to get chain id");
 
-    // Load the deployment from the path.
     let deployment_path = contracts_path(chain_id);
-    let deployment: Deployment = serde_json::from_reader(
-        std::fs::File::open(deployment_path).expect("Failed to open deployment.json"),
-    )
-    .expect("Failed to parse deployment.json");
+    let sp1_tee_verifier = retrieve_tee_verifier_contract_address(deployment_path).unwrap();
 
-    println!("Deployed Verifier: {:?}", deployment.sp1_tee_verifier);
+    println!("Deployed Verifier: {sp1_tee_verifier:?}");
 
     ///////////////////////////////
     // Add the signers
@@ -182,7 +169,7 @@ async fn main() {
         .await
         .expect("Failed to get attestations");
 
-    let verifier = TEEVerifier::new(deployment.sp1_tee_verifier, provider);
+    let verifier = TEEVerifier::new(sp1_tee_verifier, provider);
 
     // For each attestation, verify the attestation and add the signer, optionally checking the PCR0.
     for RawAttestation {
@@ -194,10 +181,7 @@ async fn main() {
         let doc = match sp1_tee_host::attestations::verify_attestation(&attestation) {
             Ok(doc) => doc,
             Err(e) => {
-                eprintln!(
-                    "Failed to verify attestation for address: {:?}, error: {:?}",
-                    address, e
-                );
+                eprintln!("Failed to verify attestation for address: {address:?}, error: {e:?}");
                 eprintln!("Its possible this can happen if an enclave goes down, and the expiry period has not been reached yet.");
                 continue;
             }
@@ -225,10 +209,7 @@ async fn main() {
             .expect("Failed to derive address from public key");
 
         if derived_address != address {
-            panic!(
-                "Address mismatch expected: {:?}, got: {:?}",
-                address, derived_address
-            );
+            panic!("Address mismatch expected: {address:?}, got: {derived_address:?}");
         }
 
         // Check if the signer is already registered.
@@ -252,9 +233,9 @@ async fn main() {
                 .await
                 .expect("Failed to get confirmation of adding signer");
 
-            println!("Added signer: {:?}", address);
+            println!("Added signer: {address:?}");
         } else {
-            println!("Found valid signer: {:?}", address);
+            println!("Found valid signer: {address:?}");
         }
     }
 
@@ -265,46 +246,35 @@ async fn main() {
     }
 }
 
-fn unwrap_or_env(value: &Option<String>, env_var: &str) -> String {
-    match value {
-        Some(value) => value.clone(),
-        None => std::env::var(env_var).unwrap_or_else(|_| {
-            panic!(
-                "{} env var is not set, and was not provided in the Args.",
-                env_var
-            )
-        }),
-    }
-}
-
 fn deploy_args<P: WalletProvider>(cmd: &mut Command, args: &Args, provider: &P) {
     // let etherscan_url = unwrap_or_env(&args.etherscan_url, "ETHERSCAN_URL");
-    let etherscan_api_key = unwrap_or_env(&args.etherscan_api_key, "ETHERSCAN_API_KEY");
-    let verifier_gateway = unwrap_or_env(
-        &args.verifier_gateway.as_ref().map(|a| a.to_string()),
-        "SP1_VERIFIER_GATEWAY",
-    );
+    let etherscan_api_key = args
+        .etherscan_api_key
+        .as_ref()
+        .expect("The etherscan api key is required when deploying");
+    let verifier_gateway = args
+        .verifier_gateway
+        .as_ref()
+        .expect("The verifier gateway is required when deploying");
 
-    println!(
-        "Deploying contracts with verifier gateway: {}",
-        verifier_gateway
-    );
+    println!("Deploying contracts with verifier gateway: {verifier_gateway}");
 
     // NOTE: Private key is overriden on the `Args` type, so we don't check the env here.
-    cmd.env("SP1_VERIFIER_GATEWAY", &verifier_gateway).args([
-        "script",
-        "script/Deploy.s.sol",
-        "--rpc-url",
-        &args.rpc_url,
-        "--verify",
-        "--etherscan-api-key",
-        &etherscan_api_key,
-        "--broadcast",
-        "--sender",
-        &provider.default_signer_address().to_string(),
-        "--private-key",
-        args.private_key.as_ref().expect("Private key is not set"),
-    ]);
+    cmd.env("SP1_VERIFIER_GATEWAY", verifier_gateway.to_string())
+        .args([
+            "script",
+            "script/Deploy.s.sol",
+            "--rpc-url",
+            &args.rpc_url,
+            "--verify",
+            "--etherscan-api-key",
+            etherscan_api_key,
+            "--broadcast",
+            "--sender",
+            &provider.default_signer_address().to_string(),
+            "--private-key",
+            args.private_key.as_ref(),
+        ]);
 }
 
 fn anvil_deploy_args<P: WalletProvider>(cmd: &mut Command, args: &Args, provider: &P) {
@@ -317,22 +287,6 @@ fn anvil_deploy_args<P: WalletProvider>(cmd: &mut Command, args: &Args, provider
         "--sender",
         &provider.default_signer_address().to_string(),
         "--private-key",
-        args.private_key.as_ref().expect("Private key is not set"),
+        args.private_key.as_ref(),
     ]);
-}
-
-fn contracts_path(chain_id: u64) -> PathBuf {
-    const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
-
-    let mut path = PathBuf::from(MANIFEST_DIR);
-    path = path
-        .parent()
-        .expect("Failed to get parent of manifest dir")
-        .to_path_buf();
-
-    path.push("contracts");
-    path.push("deployments");
-    path.push(format!("{}.json", chain_id));
-
-    path
 }

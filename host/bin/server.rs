@@ -24,6 +24,12 @@ use futures::stream::{self, Stream, StreamExt};
 
 #[tokio::main]
 async fn main() {
+    dotenv::dotenv().ok();
+
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .unwrap();
+
     sp1_tee_host::init_tracing();
 
     let args = ServerArgs::parse();
@@ -36,12 +42,13 @@ async fn main() {
     // Start the server.
     //
     // This function also starts the enclave and spawns a task to save attestations to S3.
-    let server = Server::new(&args);
+    let server = Server::new(&args).await;
 
     let app = Router::new()
         .route("/execute", post(execute).layer(DefaultBodyLimit::disable()))
         .route("/address", get(get_address))
         .route("/signers", get(get_signers))
+        .route("/health", get(health))
         .with_state(server);
 
     let listener = TcpListener::bind((args.address.clone(), args.port))
@@ -301,4 +308,11 @@ async fn execute_inner(
             Err(ServerError::UnexpectedResponseFromEnclave)
         }
     }
+}
+
+async fn health(State(server): State<Arc<Server>>) -> Result<(), ServerError> {
+    // Checking we can communicate with the enclave
+    let _ = get_address(State(server)).await?;
+
+    Ok(())
 }

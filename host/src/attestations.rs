@@ -76,67 +76,48 @@ impl Default for SaveAttestationArgs {
 #[derive(Debug, thiserror::Error)]
 #[allow(clippy::large_enum_variant)]
 pub enum SaveAttestationError {
-    #[error("Failed to communicate with enclave: {0:?}")]
-    VsockError(#[from] CommunicationError),
-
     #[error("Failed to put object: {0:?}")]
     S3PutObjectError(#[from] SdkError<PutObjectError>),
+
+    #[error("Failed retrieve the attestation: {0:?}")]
+    RetrieveAttestationError(#[from] RetrieveAttestationError),
+}
+
+#[derive(Debug, thiserror::Error)]
+#[allow(clippy::large_enum_variant)]
+pub enum RetrieveAttestationError {
+    #[error("Failed to communicate with enclave: {0:?}")]
+    VsockError(#[from] CommunicationError),
 
     #[error("Got a bad public key from the enclave, this is a bug.")]
     BadPublicKey,
 
-    #[error("Unexpected message from enclave, expected signing key attestation, got {0:?}")]
+    #[error("Unexpected message from enclave, expected signing key attestation, got {0}")]
     UnexpectedMessage(&'static str),
 }
 
 /// Save the attestation to S3.
 ///
 /// This function will connect to the enclave, request the signing key attestation, and save it to S3.
-pub async fn save_attestation(args: SaveAttestationArgs) -> Result<(), SaveAttestationError> {
-    tracing::debug!("Save attestation args: {:#?}", args);
-
-    let SaveAttestationArgs { cid, port, bucket } = args;
-
+pub async fn save_attestation(
+    raw_attestation: RawAttestation,
+    bucket: String,
+) -> Result<(), SaveAttestationError> {
     let s3_client = s3_client_write().await;
 
-    // Connect to the enclave.
-    let mut stream = HostStream::new(cid, port).await?;
+    tracing::info!(
+        "Saving attestation to S3 for address: {}",
+        raw_attestation.address
+    );
 
-    // Request the signing key attestation.
-    let attest_signing_key = EnclaveRequest::AttestSigningKey;
-    let get_public_key = EnclaveRequest::GetPublicKey;
-
-    stream.send(attest_signing_key).await?;
-    stream.send(get_public_key).await?;
-
-    let attestation = match stream.recv().await? {
-        EnclaveResponse::SigningKeyAttestation(attestation) => attestation,
-        msg => {
-            return Err(SaveAttestationError::UnexpectedMessage(msg.type_of()));
-        }
-    };
-
-    let public_key = match stream.recv().await? {
-        EnclaveResponse::PublicKey(public_key) => public_key,
-        msg => {
-            return Err(SaveAttestationError::UnexpectedMessage(msg.type_of()));
-        }
-    };
-
-    // The address of the enclave is the S3 bucket key.
-    let key = ethereum_address_from_encoded_point(&public_key)
-        .ok_or(SaveAttestationError::BadPublicKey)?;
-
-    tracing::info!("Saving attestation to S3 for address: {}", key);
-
-    let key = key.to_string();
+    let key = raw_attestation.address.to_string();
 
     // Write the attestation to S3.
     s3_client
         .put_object()
         .bucket(bucket)
         .key(key)
-        .body(attestation.into())
+        .body(raw_attestation.attestation.into())
         .send()
         .await?;
 
@@ -161,6 +142,44 @@ pub enum GetAttestationError {
 pub struct RawAttestation {
     pub address: Address,
     pub attestation: Vec<u8>,
+}
+
+pub async fn retrieve_attestation_from_enclave(
+    cid: u32,
+    port: u16,
+) -> Result<RawAttestation, RetrieveAttestationError> {
+    // Connect to the enclave.
+    let mut stream = HostStream::new(cid, port).await?;
+
+    // Request the signing key attestation.
+    let attest_signing_key = EnclaveRequest::AttestSigningKey;
+    let get_public_key = EnclaveRequest::GetPublicKey;
+
+    stream.send(attest_signing_key).await?;
+    stream.send(get_public_key).await?;
+
+    let attestation = match stream.recv().await? {
+        EnclaveResponse::SigningKeyAttestation(attestation) => attestation,
+        msg => {
+            return Err(RetrieveAttestationError::UnexpectedMessage(msg.type_of()));
+        }
+    };
+
+    let public_key = match stream.recv().await? {
+        EnclaveResponse::PublicKey(public_key) => public_key,
+        msg => {
+            return Err(RetrieveAttestationError::UnexpectedMessage(msg.type_of()));
+        }
+    };
+
+    // The address of the enclave is the S3 bucket key.
+    let address = ethereum_address_from_encoded_point(&public_key)
+        .ok_or(RetrieveAttestationError::BadPublicKey)?;
+
+    Ok(RawAttestation {
+        address,
+        attestation,
+    })
 }
 
 /// Tries to fetch all attestations from S3.

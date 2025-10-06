@@ -31,15 +31,14 @@ if [ $1 == "terminate" ]; then
     exit 0
 fi
 
-# Always build the enclave from scratch.
-if [[ $2 == "-f" || $2 == "--debug" ]]; then
-    docker build --build-arg DEBUG_MODE=1 -t sp1-tee .
-else
-    docker build -t sp1-tee .
+if [ -z "$ENCLAVE_TAG" ]; then
+    echo "ENCLAVE_TAG is not set, exiting..."
+    exit 1;
 fi
 
+
 # Create the EIF from the enclave.
-nitro-cli build-enclave --docker-uri sp1-tee:latest --output-file sp1-tee.eif
+nitro-cli build-enclave --docker-uri public.ecr.aws/succinct-labs/sp1-tee-enclave:$ENCLAVE_TAG --output-file sp1-tee.eif
 
 # Setup default values if not set.
 if [ -z "$ENCLAVE_CPU_COUNT" ]; then

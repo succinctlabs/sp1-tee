@@ -39,6 +39,8 @@ contract DeployScript is Script {
             string.concat(vm.projectRoot(), "/deployments/", vm.toString(block.chainid), ".json");
 
         vm.writeFile(deploymentOutfile, "");
-        vm.writeJson({json: vm.serializeAddress("", "SP1TeeVerifier", address(sp1TeeVerifier)), path: deploymentOutfile});
+        vm.writeJson({
+            json: vm.serializeAddress("", "SP1TeeVerifier", address(sp1TeeVerifier)), path: deploymentOutfile
+        });
     }
 }

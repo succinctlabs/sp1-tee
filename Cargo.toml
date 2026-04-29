@@ -27,13 +27,9 @@ tracing = "0.1.41"
 # Alerts
 alert-subscriber = { git = "https://github.com/succinctlabs/alert-subscriber.git", branch = "main" }
 
-sp1-sdk = { version = "5.2.1" }
-sp1-prover = { version = "5.2.1" }
+sp1-sdk = { version = "5.2.4" }
+sp1-prover = { version = "5.2.4" }
 
 # [patch.crates-io]
 # sp1-sdk = { path = "../sp1/crates/sdk" }
 # sp1-prover = { path = "../sp1/crates/prover" }
-
-[patch.crates-io]
-sp1-sdk = { git = "https://github.com/succinctlabs/sp1", branch = "aurelien/update-tee-version" }
-sp1-prover = { git = "https://github.com/succinctlabs/sp1", branch = "aurelien/update-tee-version" }

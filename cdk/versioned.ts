@@ -66,7 +66,11 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
                 vpcSubnets: {
                     subnetType: cdk.aws_ec2.SubnetType.PUBLIC,
                 },
-                updatePolicy: cdk.aws_autoscaling.UpdatePolicy.rollingUpdate(),
+                updatePolicy: cdk.aws_autoscaling.UpdatePolicy.rollingUpdate({
+                    minInstancesInService: 1,
+                    maxBatchSize: 1,
+                    pauseTime: cdk.Duration.minutes(30),
+                }),
             },
         );
 

@@ -131,3 +131,11 @@ jobs:
             - name: Deploy Versioned Stack
               run: |
                   cdk deploy Sp1TeeVersionedStack-${{ env.RELEASE_TAG }} --require-approval never
+
+            - name: Deploy Stub Stack
+              run: |
+                  if [ "${{ steps.env.outputs.environment }}" = "staging" ]; then
+                    cdk deploy Sp1TeeStubStack-staging --require-approval never
+                  else
+                    cdk deploy Sp1TeeStubStack --require-approval never
+                  fi

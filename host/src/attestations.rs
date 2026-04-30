@@ -8,11 +8,15 @@ use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Error;
 use aws_sdk_s3::primitives::ByteStreamError;
 use aws_sdk_s3::{error::SdkError, operation::put_object::PutObjectError};
-use sp1_tee_common::{CommunicationError, EnclaveRequest, EnclaveResponse};
+use sp1_tee_common::CommunicationError;
+#[cfg(feature = "server")]
+use sp1_tee_common::{EnclaveRequest, EnclaveResponse};
 
 use aws_nitro_enclaves_nsm_api::api::AttestationDoc;
 
+#[cfg(feature = "server")]
 use crate::ethereum_address_from_encoded_point;
+#[cfg(feature = "server")]
 use crate::HostStream;
 
 // Attestations expire every 3 hours and we update every 30 mins.
@@ -144,6 +148,7 @@ pub struct RawAttestation {
     pub attestation: Vec<u8>,
 }
 
+#[cfg(feature = "server")]
 pub async fn retrieve_attestation_from_enclave(
     cid: u32,
     port: u16,

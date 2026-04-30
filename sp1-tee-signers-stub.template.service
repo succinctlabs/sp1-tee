@@ -1,0 +1,15 @@
+[Unit]
+Description=SP1 TEE Signers Stub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ec2-user
+ExecStart=/home/ec2-user/.cargo/bin/sp1-tee-signers-stub --address 0.0.0.0 --port 8080
+Restart=always
+RestartSec=5s
+Environment=RUST_LOG=info
+
+[Install]
+WantedBy=multi-user.target

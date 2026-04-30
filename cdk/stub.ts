@@ -1,0 +1,182 @@
+import * as cdk from "aws-cdk-lib";
+import { Construct } from "constructs";
+import { Environment } from "./base";
+
+export interface Sp1TeeStubProps extends cdk.StackProps {
+    environment: Environment;
+    /**
+     * sp1-tee commit SHA (or branch / tag) to clone on the stub host. Pinning
+     * to a specific commit makes ASG instance replacements reproducible — a
+     * later replacement re-runs cargo install against the same source rather
+     * than tracking whatever happens to be at `main` HEAD.
+     */
+    commit: string;
+    vpc: cdk.aws_ec2.Vpc;
+    loadBalancer: cdk.aws_elasticloadbalancingv2.ApplicationLoadBalancer;
+    httpsListener: cdk.aws_elasticloadbalancingv2.ApplicationListener;
+}
+
+/**
+ * Deploys the `sp1-tee-signers-stub` binary on a small ARM EC2 instance behind
+ * the existing application load balancer. A dedicated listener rule routes
+ * requests carrying the `X-SP1-Tee-Stub: 1` header to the stub target group;
+ * traffic without that header continues to flow to the existing target groups
+ * (`Sp1TeeVersionedStack-*`) untouched.
+ */
+export class Sp1TeeStubStack extends cdk.Stack {
+    constructor(scope: Construct, id: string, props: Sp1TeeStubProps) {
+        super(scope, id, props);
+
+        const userData = this.buildUserData(props.commit);
+
+        // Dedicated IAM role: only what the stub host actually needs.
+        // - SSM agent: `AmazonSSMManagedInstanceCore` (so we can debug via
+        //   Session Manager without opening SSH).
+        // - cfn-signal: CDK adds a stack-scoped `cloudformation:SignalResource`
+        //   policy when `Signals.waitForCount` is used below.
+        // Notably no AmazonS3FullAccess and no `sp1_tee` Secrets read — the
+        // stub reads attestations anonymously via `s3_client_read_only`.
+        const role = new cdk.aws_iam.Role(this, "SP1_TEE_StubInstanceRole", {
+            assumedBy: new cdk.aws_iam.ServicePrincipal("ec2.amazonaws.com"),
+            managedPolicies: [
+                cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
+                    "AmazonSSMManagedInstanceCore",
+                ),
+            ],
+        });
+
+        // Dedicated SG. CDK auto-adds the ALB SG → port 8080 ingress when the
+        // ASG is attached to the target group below, so no explicit ingress
+        // rule is needed here. Egress defaults to allow-all (rust toolchain
+        // download + crates.io fetch + S3 attestation list).
+        const securityGroup = new cdk.aws_ec2.SecurityGroup(
+            this,
+            "SP1_TEE_StubSecurityGroup",
+            {
+                vpc: props.vpc,
+                description: "SP1 TEE signers-stub host",
+                allowAllOutbound: true,
+            },
+        );
+
+        const launchTemplate = new cdk.aws_ec2.LaunchTemplate(
+            this,
+            "SP1_TEE_StubLaunchTemplate",
+            {
+                instanceType: new cdk.aws_ec2.InstanceType("t4g.medium"),
+                machineImage: cdk.aws_ec2.MachineImage.latestAmazonLinux2023({
+                    cpuType: cdk.aws_ec2.AmazonLinuxCpuType.ARM_64,
+                }),
+                securityGroup,
+                userData,
+                role,
+                blockDevices: [
+                    {
+                        // Root volume bumped to 20 GB to comfortably hold the
+                        // OS, the rust toolchain, the cargo build cache, and
+                        // the 4 GB swapfile that install-stub.sh provisions.
+                        deviceName: "/dev/xvda",
+                        volume: cdk.aws_ec2.BlockDeviceVolume.ebs(20, {
+                            volumeType: cdk.aws_ec2.EbsDeviceVolumeType.GP3,
+                            deleteOnTermination: true,
+                        }),
+                    },
+                ],
+            },
+        );
+
+        const asg = new cdk.aws_autoscaling.AutoScalingGroup(
+            this,
+            "SP1_TEE_StubAutoScalingGroup",
+            {
+                minCapacity: 1,
+                desiredCapacity: 1,
+                maxCapacity: 1,
+                launchTemplate,
+                vpc: props.vpc,
+                vpcSubnets: {
+                    subnetType: cdk.aws_ec2.SubnetType.PUBLIC,
+                },
+                // Block CFN deploy until the instance signals success at the
+                // end of user-data. Timeout sits inside healthCheckGracePeriod
+                // so a stuck install surfaces as a CFN failure before the ASG
+                // starts replacing the instance for ALB-unhealthy reasons.
+                signals: cdk.aws_autoscaling.Signals.waitForCount(1, {
+                    timeout: cdk.Duration.minutes(25),
+                }),
+                healthChecks: cdk.aws_autoscaling.HealthChecks.ec2({
+                    gracePeriod: cdk.Duration.minutes(30),
+                }),
+                updatePolicy: cdk.aws_autoscaling.UpdatePolicy.rollingUpdate({
+                    minInstancesInService: 0,
+                    maxBatchSize: 1,
+                    pauseTime: cdk.Duration.minutes(30),
+                }),
+            },
+        );
+
+        // Inject `cfn-signal` at the end of user-data, paired with the
+        // `signals` block above.
+        userData.addSignalOnExitCommand(asg);
+
+        const targetGroup = new cdk.aws_elasticloadbalancingv2.ApplicationTargetGroup(
+            this,
+            "SP1_TEE_StubTargetGroup",
+            {
+                targets: [asg],
+                protocol: cdk.aws_elasticloadbalancingv2.ApplicationProtocol.HTTP,
+                port: 8080,
+                vpc: props.vpc,
+                healthCheck: {
+                    path: "/health",
+                    protocol: cdk.aws_elasticloadbalancingv2.Protocol.HTTP,
+                    port: "8080",
+                },
+            },
+        );
+
+        new cdk.aws_elasticloadbalancingv2.ApplicationListenerRule(
+            this,
+            "SP1_TEE_StubRule",
+            {
+                listener: props.httpsListener,
+                targetGroups: [targetGroup],
+                conditions: [
+                    cdk.aws_elasticloadbalancingv2.ListenerCondition.httpHeader(
+                        "X-SP1-Tee-Stub",
+                        ["1"],
+                    ),
+                ],
+                // Below the versioned rules at `99 + version` so a request
+                // carrying BOTH `X-SP1-Tee-Stub: 1` and the normal SDK
+                // `X-SP1-Tee-Version` header still lands on the stub during
+                // header-gated validation.
+                priority: 50,
+            },
+        );
+    }
+
+    buildUserData(commit: string): cdk.aws_ec2.UserData {
+        const userData = cdk.aws_ec2.UserData.forLinux();
+
+        // `sudo -u ec2-user -H` runs install-stub.sh as ec2-user with HOME
+        // set to /home/ec2-user, so `~/.cargo/env` and the systemd unit's
+        // hardcoded path agree.
+        const checkoutCmd = commit
+            ? `git checkout --detach ${commit}`
+            : "# no commit pin set — leaving default branch checked out";
+
+        userData.addCommands(
+            "set -euo pipefail",
+            "dnf install -y git aws-cfn-bootstrap",
+            "cd /home/ec2-user",
+            "git clone https://github.com/succinctlabs/sp1-tee.git",
+            "cd sp1-tee",
+            checkoutCmd,
+            "chown -R ec2-user:ec2-user .",
+            "sudo -u ec2-user -H ./scripts/install-stub.sh",
+        );
+
+        return userData;
+    }
+}

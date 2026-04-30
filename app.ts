@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as cdk from "aws-cdk-lib";
 import { Sp1TeeBaseStack, Environment } from "./cdk/base";
+import { Sp1TeeStubStack } from "./cdk/stub";
 import { Sp1TeeVersionedStack } from "./cdk/versioned";
 
 const app = new cdk.App();
@@ -57,4 +58,14 @@ new Sp1TeeVersionedStack(app, `Sp1TeeVersionedStack-${releaseTag}`, {
     role: base.role,
     secret: base.secret,
     alertsTopic: base.alertsTopic,
+});
+
+new Sp1TeeStubStack(app, `Sp1TeeStubStack${environment}`, {
+    env: { account: props.env.account, region: props.env.region },
+
+    environment,
+    commit,
+    vpc: base.vpc,
+    loadBalancer: base.loadBalancer,
+    httpsListener: base.httpsListener,
 });

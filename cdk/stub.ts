@@ -153,7 +153,7 @@ export class Sp1TeeStubStack extends cdk.Stack {
                 targetGroups: [targetGroup],
                 conditions: [
                     cdk.aws_elasticloadbalancingv2.ListenerCondition.pathPatterns(
-                        ["/signers"],
+                        ["/signers", "/signers/"],
                     ),
                     cdk.aws_elasticloadbalancingv2.ListenerCondition.httpHeader(
                         "X-SP1-TEE-Version",

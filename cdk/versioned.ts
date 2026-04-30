@@ -73,8 +73,15 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
                 vpcSubnets: {
                     subnetType: cdk.aws_ec2.SubnetType.PUBLIC,
                 },
+                // The versioned fleet idles at desired=0 by default (Phase 2
+                // cutover — `/signers` is served by Sp1TeeStubStack). Allow
+                // rolling updates to drop to 0 in-service so launch-template
+                // updates don't conflict with the idle baseline. When the
+                // fleet is scaled back up for attestation generation,
+                // updates will still proceed one instance at a time with the
+                // 30-minute cold-start pause window.
                 updatePolicy: cdk.aws_autoscaling.UpdatePolicy.rollingUpdate({
-                    minInstancesInService: 1,
+                    minInstancesInService: 0,
                     maxBatchSize: 1,
                     pauseTime: cdk.Duration.minutes(30),
                 }),

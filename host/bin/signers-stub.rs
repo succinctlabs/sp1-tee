@@ -74,7 +74,8 @@ async fn get_signers() -> Result<Response, StatusCode> {
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    tracing::debug!("Fetched {} raw attestations", raw_attestations.len());
+    let total = raw_attestations.len();
+    tracing::debug!("Fetched {} raw attestations", total);
 
     let signers: Vec<_> = raw_attestations
         .iter()
@@ -87,6 +88,15 @@ async fn get_signers() -> Result<Response, StatusCode> {
         })
         .filter_map(|doc| sp1_tee_host::ethereum_address_from_sec1_bytes(doc.public_key.as_ref()?))
         .collect();
+
+    let skipped = total.saturating_sub(signers.len());
+    if skipped > 0 {
+        tracing::warn!(
+            "Skipped {} of {} attestations (verify failed, version mismatch, or bad pubkey)",
+            skipped,
+            total
+        );
+    }
 
     tracing::info!("Returning {} signers", signers.len());
 

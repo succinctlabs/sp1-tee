@@ -60,6 +60,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
             `SP1_TEE_AutoScalingGroup_${props.releaseTag}`,
             {
                 minCapacity: 1,
+                desiredCapacity: 1,
                 maxCapacity: 5,
                 launchTemplate,
                 vpc: props.vpc,

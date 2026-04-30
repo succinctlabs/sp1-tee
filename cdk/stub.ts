@@ -135,6 +135,38 @@ export class Sp1TeeStubStack extends cdk.Stack {
             },
         );
 
+        // Primary `/signers` route. The stub serves the same response as the
+        // versioned fleet's `/signers` handler (byte-identical, verified live
+        // in the prior phase), but reads cached attestations directly from S3
+        // instead of running an enclave.
+        //
+        // Conditions are ANDed: `/signers` path AND the SDK's normal
+        // `X-SP1-TEE-Version: 1` header. Higher precedence than the versioned
+        // rule at `99 + version` (= 100), so SDK clients land on the stub.
+        // Other paths under that header (`/execute`, `/address`, `/health`)
+        // do not match here and fall through to the versioned rule.
+        new cdk.aws_elasticloadbalancingv2.ApplicationListenerRule(
+            this,
+            "SP1_TEE_StubSignersPathRule",
+            {
+                listener: props.httpsListener,
+                targetGroups: [targetGroup],
+                conditions: [
+                    cdk.aws_elasticloadbalancingv2.ListenerCondition.pathPatterns(
+                        ["/signers"],
+                    ),
+                    cdk.aws_elasticloadbalancingv2.ListenerCondition.httpHeader(
+                        "X-SP1-TEE-Version",
+                        ["1"],
+                    ),
+                ],
+                priority: 30,
+            },
+        );
+
+        // Header-gated validation/debug bypass. Preserved so the stub stays
+        // reachable independently of the path-routed primary rule above —
+        // useful for direct curl checks during incident response.
         new cdk.aws_elasticloadbalancingv2.ApplicationListenerRule(
             this,
             "SP1_TEE_StubRule",
@@ -147,10 +179,6 @@ export class Sp1TeeStubStack extends cdk.Stack {
                         ["1"],
                     ),
                 ],
-                // Below the versioned rules at `99 + version` so a request
-                // carrying BOTH `X-SP1-Tee-Stub: 1` and the normal SDK
-                // `X-SP1-Tee-Version` header still lands on the stub during
-                // header-gated validation.
                 priority: 50,
             },
         );

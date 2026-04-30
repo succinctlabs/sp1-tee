@@ -128,10 +128,11 @@ jobs:
                     cdk deploy Sp1TeeBaseStack --require-approval never
                   fi               
 
-            - name: Deploy Versioned Stack
-              run: |
-                  cdk deploy Sp1TeeVersionedStack-${{ env.RELEASE_TAG }} --require-approval never
-
+            # Stub Stack must deploy BEFORE Versioned Stack: this ensures the
+            # priority-30 `/signers` rule is in place before the versioned ASG
+            # scales to zero (idle), so SDK clients fetching `/signers` are
+            # served by the stub throughout the rollout — no `/signers` outage
+            # window mid-deploy.
             - name: Deploy Stub Stack
               run: |
                   if [ "${{ steps.env.outputs.environment }}" = "staging" ]; then
@@ -139,3 +140,7 @@ jobs:
                   else
                     cdk deploy Sp1TeeStubStack --require-approval never
                   fi
+
+            - name: Deploy Versioned Stack
+              run: |
+                  cdk deploy Sp1TeeVersionedStack-${{ env.RELEASE_TAG }} --require-approval never

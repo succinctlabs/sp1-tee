@@ -18,6 +18,11 @@ name = "validate_signers"
 path = "bin/validate_signers.rs"
 required-features = ["attestations"]
 
+[[bin]]
+name = "sp1-tee-signers-stub"
+path = "bin/signers-stub.rs"
+required-features = ["signers-stub"]
+
 [[example]]
 name = "fibonacci"
 path = "examples/fibonacci.rs"
@@ -79,5 +84,14 @@ attestations = [
     "dep:aws-nitro-enclaves-cose",
     "dep:aws-nitro-enclaves-nsm-api",
     "dep:attestation-doc-validation",
+]
+# Lightweight HTTP stub serving /signers from cached S3 attestations
+# without running the Nitro Enclave. Intended to replace the production
+# fleet for the SDK cold-start fetch path on tiny instances (Lambda or
+# t4g.nano).
+signers-stub = [
+    "attestations",
+    "dep:axum",
+    "dep:tokio",
 ]
 client = ["sp1-sdk/tee-2fa"]

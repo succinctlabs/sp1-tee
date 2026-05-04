@@ -81,24 +81,17 @@ async fn get_signers() -> Result<Bytes, ServerError> {
 
     tracing::debug!("Found {} attestations", all_attestations.len());
 
-    let signers = all_attestations
+    let signers: Vec<_> = all_attestations
         .iter()
         .filter_map(|raw| sp1_tee_host::attestations::verify_attestation(&raw.attestation).ok())
         .filter(|doc| {
             doc.user_data
                 .as_ref()
-                .expect("No user data found in attestation")
-                == &SP1_TEE_VERSION.to_le_bytes()
+                .map(|u| u == &SP1_TEE_VERSION.to_le_bytes())
+                .unwrap_or(false)
         })
-        .map(|doc| {
-            sp1_tee_host::ethereum_address_from_sec1_bytes(
-                doc.public_key
-                    .as_ref()
-                    .expect("No public key found in attestation"),
-            )
-            .ok_or(ServerError::FailedToConvertPublicKeyToAddress)
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+        .filter_map(|doc| sp1_tee_host::ethereum_address_from_sec1_bytes(doc.public_key.as_ref()?))
+        .collect();
 
     tracing::debug!("Found {} signers", signers.len());
 

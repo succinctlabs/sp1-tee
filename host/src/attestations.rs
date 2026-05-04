@@ -220,7 +220,10 @@ pub async fn get_raw_attestations() -> Result<Vec<RawAttestation>, GetAttestatio
 
     for metadata in &contents {
         let Some(key) = metadata.key.clone() else {
-            tracing::warn!("S3 object in {} missing key field; skipping", crate::S3_BUCKET);
+            tracing::warn!(
+                "S3 object in {} missing key field; skipping",
+                crate::S3_BUCKET
+            );
             continue;
         };
 

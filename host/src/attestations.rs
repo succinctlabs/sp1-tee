@@ -209,15 +209,31 @@ pub async fn get_raw_attestations() -> Result<Vec<RawAttestation>, GetAttestatio
 
     let mut attestations = Vec::new();
 
-    for metadata in &attestation_s3_objs
-        .contents
-        .expect("No contents found in attestations")
-    {
-        let key = metadata.key.clone().expect("No key found in attestations");
+    let contents = attestation_s3_objs.contents.unwrap_or_default();
+    if contents.is_empty() {
+        tracing::warn!(
+            "S3 bucket {} returned no attestation objects; serving empty signer list",
+            crate::S3_BUCKET
+        );
+        return Ok(attestations);
+    }
 
-        let key_as_address = key
-            .parse::<Address>()
-            .expect("Failed to parse key as address");
+    for metadata in &contents {
+        let Some(key) = metadata.key.clone() else {
+            tracing::warn!(
+                "S3 object in {} missing key field; skipping",
+                crate::S3_BUCKET
+            );
+            continue;
+        };
+
+        let key_as_address = match key.parse::<Address>() {
+            Ok(addr) => addr,
+            Err(e) => {
+                tracing::warn!("S3 object key {key} not a valid address: {e}; skipping");
+                continue;
+            }
+        };
 
         // Fetch the actual object from S3.
         let object = s3_client

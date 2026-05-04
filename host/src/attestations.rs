@@ -209,10 +209,16 @@ pub async fn get_raw_attestations() -> Result<Vec<RawAttestation>, GetAttestatio
 
     let mut attestations = Vec::new();
 
-    for metadata in &attestation_s3_objs
-        .contents
-        .expect("No contents found in attestations")
-    {
+    let contents = attestation_s3_objs.contents.unwrap_or_default();
+    if contents.is_empty() {
+        tracing::warn!(
+            "S3 bucket {} returned no attestation objects; serving empty signer list",
+            crate::S3_BUCKET
+        );
+        return Ok(attestations);
+    }
+
+    for metadata in &contents {
         let key = metadata.key.clone().expect("No key found in attestations");
 
         let key_as_address = key

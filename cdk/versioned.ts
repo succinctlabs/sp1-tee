@@ -59,29 +59,25 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
             this,
             `SP1_TEE_AutoScalingGroup_${props.releaseTag}`,
             {
-                // The `/signers` path is now served by Sp1TeeStubStack (Phase
-                // 2 cutover). The versioned enclave fleet stays defined so it
-                // can be scaled up briefly when a new attestation needs to be
-                // generated (SP1 upgrade, key rotation), but idles at zero by
-                // default. Scale up: `aws autoscaling set-desired-capacity
-                // --desired-capacity 1 --auto-scaling-group-name ...`.
-                minCapacity: 0,
-                desiredCapacity: 0,
+                // The versioned enclave is the only writer of attestations to
+                // `sp1-tee-attestations`. Attestation docs carry a 3h cert
+                // expiry, and the bucket has a 1-day lifecycle rule, so a
+                // fresh attestation must land at least every ~3h or
+                // `/signers` (served by Sp1TeeStubStack) returns no valid
+                // signers. Idling this fleet to 0 reproduces that failure.
+                // Keep min/desired = 1 so the enclave runs continuously and
+                // refreshes attestations every 30 min (see
+                // `host/src/attestations.rs::ATTESTATION_INTERVAL`).
+                minCapacity: 1,
+                desiredCapacity: 1,
                 maxCapacity: 5,
                 launchTemplate,
                 vpc: props.vpc,
                 vpcSubnets: {
                     subnetType: cdk.aws_ec2.SubnetType.PUBLIC,
                 },
-                // The versioned fleet idles at desired=0 by default (Phase 2
-                // cutover — `/signers` is served by Sp1TeeStubStack). Allow
-                // rolling updates to drop to 0 in-service so launch-template
-                // updates don't conflict with the idle baseline. When the
-                // fleet is scaled back up for attestation generation,
-                // updates will still proceed one instance at a time with the
-                // 30-minute cold-start pause window.
                 updatePolicy: cdk.aws_autoscaling.UpdatePolicy.rollingUpdate({
-                    minInstancesInService: 0,
+                    minInstancesInService: 1,
                     maxBatchSize: 1,
                     pauseTime: cdk.Duration.minutes(30),
                 }),

@@ -135,9 +135,22 @@ async fn main() -> Result<(), GenerateError> {
             etag
         }
         Err(e) => {
-            tracing::info!(
-                "no comparable previous snapshot ({e}); proceeding without shrink check or If-Match"
-            );
+            // `--allow-shrink` only meaningfully relaxes a check that
+            // requires a comparable previous snapshot to exist. When
+            // none does (NotFound / corrupt / wrong-version / empty),
+            // the flag is a no-op — but operators who pass it are
+            // expressing the expectation that one exists, so surface
+            // the mismatch rather than silently proceeding.
+            if args.allow_shrink {
+                tracing::warn!(
+                    "--allow-shrink supplied but no comparable previous snapshot exists ({e}); \
+                     flag has no effect — proceeding with first/recovery write"
+                );
+            } else {
+                tracing::info!(
+                    "no comparable previous snapshot ({e}); proceeding without shrink check or If-Match"
+                );
+            }
             None
         }
     };

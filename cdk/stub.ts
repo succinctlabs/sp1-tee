@@ -117,9 +117,19 @@ export class Sp1TeeStubStack extends cdk.Stack {
             this,
             "SP1_TEE_StubAutoScalingGroup",
             {
+                // Steady state: one t4g.medium serving `/signers`. Roll
+                // headroom: maxCapacity=2 lets a fresh build-on-boot
+                // instance come into service alongside the old one
+                // before the old one drains, paired with
+                // `minInstancesInService: 1` below. Stub install runs
+                // `cargo install` on aarch64 (~15-25 min on this
+                // instance class), so a strict in-place replacement
+                // would create a 15+ min `/signers` outage; this
+                // policy keeps an old instance serving until the new
+                // one passes ALB health checks.
                 minCapacity: 1,
                 desiredCapacity: 1,
-                maxCapacity: 1,
+                maxCapacity: 2,
                 launchTemplate,
                 vpc: props.vpc,
                 vpcSubnets: {
@@ -136,7 +146,12 @@ export class Sp1TeeStubStack extends cdk.Stack {
                     gracePeriod: cdk.Duration.minutes(30),
                 }),
                 updatePolicy: cdk.aws_autoscaling.UpdatePolicy.rollingUpdate({
-                    minInstancesInService: 0,
+                    // Keep at least one instance serving across rolling
+                    // updates. Combined with maxCapacity=2 above, this
+                    // gives zero-downtime stub updates: new instance
+                    // launches, builds, becomes ALB-healthy, then the
+                    // old one drains.
+                    minInstancesInService: 1,
                     maxBatchSize: 1,
                     pauseTime: cdk.Duration.minutes(30),
                 }),

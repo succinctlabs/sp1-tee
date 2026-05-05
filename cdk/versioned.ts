@@ -51,6 +51,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
             props.commit,
             props.secret.secretArn,
             props.snapshotsBucket.bucketName,
+            this.region,
         );
 
         const launchTemplate = new cdk.aws_ec2.LaunchTemplate(
@@ -155,6 +156,7 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
         commit: string,
         secretArn: string,
         snapshotsBucket: string,
+        region: string,
     ): cdk.aws_ec2.UserData {
         const userData = cdk.aws_ec2.UserData.forLinux();
 
@@ -184,13 +186,21 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
             );
         });
 
-        // Persist the snapshots bucket name in a stable on-disk location.
-        // Operators running the manual `sp1-tee-snapshot-generate` step
-        // pick it up from here (see runbook in PR description).
+        // Persist the snapshots bucket name + AWS region in stable
+        // on-disk locations. Operators running the manual
+        // `sp1-tee-snapshot-generate` step source these into the
+        // generator's environment (see runbook in deploy.yml gate
+        // error). Pinning AWS_REGION explicitly here matches the
+        // stub's systemd unit pin and protects against an EC2 IMDS
+        // hiccup during snapshot generation, which would otherwise
+        // let aws-config silently fall back to a wrong default and
+        // cross-region-redirect on every PutObject (especially
+        // visible on staging in us-west-1).
         userData.addCommands(
             "mkdir -p /etc/sp1-tee",
             `echo '${snapshotsBucket}' > /etc/sp1-tee/snapshots-bucket`,
-            "chmod 0644 /etc/sp1-tee/snapshots-bucket",
+            `echo '${region}' > /etc/sp1-tee/aws-region`,
+            "chmod 0644 /etc/sp1-tee/snapshots-bucket /etc/sp1-tee/aws-region",
         );
 
         // Clone the repo

@@ -77,24 +77,53 @@ async fn main() {
 async fn get_signers() -> Result<Bytes, ServerError> {
     tracing::info!("Handling get all signers for version request");
 
+    // Snapshot path: re-run Nitro verification + derivation on the cached
+    // `Vec<RawAttestation>` so PutObject on the snapshot key is not by
+    // itself sufficient to forge the served signer set.
+    let raw = match sp1_tee_host::attestations::read_signers_snapshot(SP1_TEE_VERSION).await {
+        Ok(raw) => raw,
+        Err(sp1_tee_host::attestations::ReadSnapshotError::NotFound(key)) => {
+            tracing::warn!("snapshot {key} not found; falling back to live derivation (bootstrap)");
+            return live_derivation_response().await;
+        }
+        Err(e) => {
+            tracing::error!(alert = true, "snapshot fetch failed: {e}");
+            return Err(ServerError::SnapshotUnavailable(e.to_string()));
+        }
+    };
+
+    let signers = sp1_tee_host::attestations::derive_signers(&raw, SP1_TEE_VERSION);
+    if signers.is_empty() {
+        tracing::error!(
+            alert = true,
+            "snapshot decoded with {} entries but produced 0 valid signers",
+            raw.len()
+        );
+        return Err(ServerError::SnapshotUnavailable(
+            "no valid signers in snapshot".to_string(),
+        ));
+    }
+
+    tracing::info!(
+        "Serving {} signers from snapshot ({} raw)",
+        signers.len(),
+        raw.len()
+    );
+
+    Ok(bincode::serialize(&signers)
+        .expect("failed to serialize signers")
+        .into())
+}
+
+async fn live_derivation_response() -> Result<Bytes, ServerError> {
     let all_attestations = sp1_tee_host::attestations::get_raw_attestations().await?;
-
-    tracing::debug!("Found {} attestations", all_attestations.len());
-
-    let signers: Vec<_> = all_attestations
-        .iter()
-        .filter_map(|raw| sp1_tee_host::attestations::verify_attestation(&raw.attestation).ok())
-        .filter(|doc| {
-            doc.user_data
-                .as_ref()
-                .map(|u| u == &SP1_TEE_VERSION.to_le_bytes())
-                .unwrap_or(false)
-        })
-        .filter_map(|doc| sp1_tee_host::ethereum_address_from_sec1_bytes(doc.public_key.as_ref()?))
-        .collect();
-
-    tracing::debug!("Found {} signers", signers.len());
-
+    let signers = sp1_tee_host::attestations::derive_signers(&all_attestations, SP1_TEE_VERSION);
+    if signers.is_empty() {
+        return Err(ServerError::SnapshotUnavailable(
+            "live derivation produced 0 valid signers".to_string(),
+        ));
+    }
+    tracing::info!("Returning {} signers (live derivation)", signers.len());
     Ok(bincode::serialize(&signers)
         .expect("failed to serialize signers")
         .into())

@@ -141,6 +141,9 @@ pub enum ServerError {
     #[error("Failed to get attestations: {0}")]
     FailedToGetAttestations(#[from] crate::attestations::GetAttestationError),
 
+    #[error("Signers snapshot unavailable: {0}")]
+    SnapshotUnavailable(String),
+
     #[cfg(feature = "production")]
     #[error("Failed to authenticate request")]
     FailedToAuthenticateRequest,
@@ -193,6 +196,10 @@ impl IntoResponse for ServerError {
             ServerError::FailedToGetAttestations(e) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Failed to get attestations, {e}"),
+            ),
+            ServerError::SnapshotUnavailable(e) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                format!("Signers snapshot unavailable: {e}"),
             ),
             #[cfg(feature = "production")]
             ServerError::FailedToAuthenticateRequest => (

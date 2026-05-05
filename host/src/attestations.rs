@@ -22,6 +22,19 @@ use crate::HostStream;
 // Attestations expire every 3 hours and we update every 30 mins.
 pub const ATTESTATION_INTERVAL: Duration = Duration::from_secs(30 * 60);
 
+/// S3 key prefix for the durable signers snapshot.
+///
+/// Objects under this prefix are intended to survive the bucket's
+/// `daily-refresh` lifecycle rule (which today applies to raw attestation
+/// objects at the bucket root). Operators must scope the lifecycle filter to
+/// exclude this prefix; see PR description.
+pub const SIGNERS_SNAPSHOT_PREFIX: &str = "snapshots/";
+
+/// Returns the S3 key for the signers snapshot at the given TEE version.
+pub fn signers_snapshot_key(version: u32) -> String {
+    format!("{SIGNERS_SNAPSHOT_PREFIX}signers-v{version}.bin")
+}
+
 /// Creates an S3 client from the environment variables.
 ///
 /// For EC2 instances, the environment variables are set automatically.
@@ -143,6 +156,7 @@ pub enum GetAttestationError {
     ByteStreamError(#[from] ByteStreamError),
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RawAttestation {
     pub address: Address,
     pub attestation: Vec<u8>,
@@ -212,7 +226,7 @@ pub async fn get_raw_attestations() -> Result<Vec<RawAttestation>, GetAttestatio
     let contents = attestation_s3_objs.contents.unwrap_or_default();
     if contents.is_empty() {
         tracing::warn!(
-            "S3 bucket {} returned no attestation objects; serving empty signer list",
+            "S3 bucket {} returned no attestation objects",
             crate::S3_BUCKET
         );
         return Ok(attestations);
@@ -252,6 +266,147 @@ pub async fn get_raw_attestations() -> Result<Vec<RawAttestation>, GetAttestatio
     }
 
     Ok(attestations)
+}
+
+/// Maximum size accepted when reading the signers snapshot from S3.
+///
+/// A realistic snapshot for the production fleet is on the order of a few
+/// kilobytes (`Vec<RawAttestation>`, attestation docs are ~5 KB each). The
+/// 1 MiB cap is several orders of magnitude above that and exists only to
+/// bound memory if a malicious or corrupted object is ever uploaded.
+pub const MAX_SNAPSHOT_BYTES: usize = 1 << 20;
+
+/// Derive the list of signer addresses from a set of raw attestations.
+///
+/// Re-runs Nitro CA verification (including the 3h cert expiry baked into
+/// the attestation doc), the SP1 TEE version filter, and the public-key →
+/// Ethereum-address derivation. Attestations that fail any step are
+/// silently skipped; a single `warn!` reports the aggregate skip count.
+///
+/// This is the trust-establishing step for `/signers`. Whatever bytes
+/// the handler ends up serving must have been produced by a successful
+/// pass through this function on a `Vec<RawAttestation>` whose contents
+/// were verified within the last 3h.
+pub fn derive_signers(raw_attestations: &[RawAttestation], sp1_tee_version: u32) -> Vec<Address> {
+    let total = raw_attestations.len();
+    let signers: Vec<Address> = raw_attestations
+        .iter()
+        .filter_map(|raw| verify_attestation(&raw.attestation).ok())
+        .filter(|doc| {
+            doc.user_data
+                .as_ref()
+                .map(|u| u == &sp1_tee_version.to_le_bytes())
+                .unwrap_or(false)
+        })
+        .filter_map(|doc| crate::ethereum_address_from_sec1_bytes(doc.public_key.as_ref()?))
+        .collect();
+
+    let skipped = total.saturating_sub(signers.len());
+    if skipped > 0 {
+        tracing::warn!(
+            "derive_signers: skipped {skipped} of {total} attestations (verify failed, version mismatch, or bad pubkey)"
+        );
+    }
+    signers
+}
+
+#[derive(Debug, thiserror::Error)]
+#[allow(clippy::large_enum_variant)]
+pub enum ReadSnapshotError {
+    #[error("snapshot object {0} not found")]
+    NotFound(String),
+
+    #[error("snapshot size {0} exceeds {MAX_SNAPSHOT_BYTES} byte cap")]
+    TooLarge(usize),
+
+    #[error("Failed to get snapshot object: {0:?}")]
+    S3GetObjectError(SdkError<GetObjectError>),
+
+    #[error("Failed to receive bytestream: {0}")]
+    ByteStreamError(#[from] ByteStreamError),
+
+    #[error("Failed to decode snapshot: {0}")]
+    BincodeError(#[from] bincode::Error),
+}
+
+#[derive(Debug, thiserror::Error)]
+#[allow(clippy::large_enum_variant)]
+pub enum WriteSnapshotError {
+    #[error("Failed to encode snapshot: {0}")]
+    BincodeError(#[from] bincode::Error),
+
+    #[error("Failed to put snapshot object: {0:?}")]
+    S3PutObjectError(#[from] SdkError<PutObjectError>),
+}
+
+/// Read the raw attestations snapshot from S3.
+///
+/// The snapshot is the bincode-serialized [`Vec<RawAttestation>`] last
+/// written by `sp1-tee-snapshot-generate`. Callers must run
+/// [`derive_signers`] over the result to recover the verified signer set
+/// — this function does NOT perform Nitro verification on the bytes; the
+/// snapshot file is assumed to be produced by a trusted writer but its
+/// contents are still cryptographically validated downstream.
+///
+/// Distinguishes a missing object ([`ReadSnapshotError::NotFound`]) from
+/// other failure modes so handlers can choose to fall back to live
+/// derivation only on bootstrap.
+pub async fn read_signers_snapshot(version: u32) -> Result<Vec<RawAttestation>, ReadSnapshotError> {
+    let s3_client = s3_client_read_only().await;
+    let key = signers_snapshot_key(version);
+
+    let object = match s3_client
+        .get_object()
+        .bucket(crate::S3_BUCKET.to_string())
+        .key(&key)
+        .send()
+        .await
+    {
+        Ok(o) => o,
+        Err(e) => {
+            if let SdkError::ServiceError(svc) = &e {
+                if matches!(svc.err(), GetObjectError::NoSuchKey(_)) {
+                    return Err(ReadSnapshotError::NotFound(key));
+                }
+            }
+            return Err(ReadSnapshotError::S3GetObjectError(e));
+        }
+    };
+
+    if let Some(len) = object.content_length() {
+        if len > MAX_SNAPSHOT_BYTES as i64 {
+            return Err(ReadSnapshotError::TooLarge(len as usize));
+        }
+    }
+
+    let bytes = object.body.collect().await?.to_vec();
+    if bytes.len() > MAX_SNAPSHOT_BYTES {
+        return Err(ReadSnapshotError::TooLarge(bytes.len()));
+    }
+
+    let raw: Vec<RawAttestation> = bincode::deserialize(&bytes)?;
+    Ok(raw)
+}
+
+/// Write a fresh raw-attestations snapshot to S3.
+///
+/// The body is `bincode::serialize(raw_attestations)`. Caller is
+/// responsible for having verified the attestations (typically via
+/// [`derive_signers`] returning a non-empty `Vec`) before calling this.
+pub async fn write_signers_snapshot(
+    version: u32,
+    raw_attestations: &[RawAttestation],
+) -> Result<(), WriteSnapshotError> {
+    let body = bincode::serialize(raw_attestations)?;
+    let s3_client = s3_client_write().await;
+    s3_client
+        .put_object()
+        .bucket(crate::S3_BUCKET.to_string())
+        .key(signers_snapshot_key(version))
+        .body(body.into())
+        .send()
+        .await?;
+    Ok(())
 }
 
 #[derive(Debug, thiserror::Error)]

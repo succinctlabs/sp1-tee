@@ -143,8 +143,9 @@ async fn main() -> Result<(), GenerateError> {
             // the mismatch rather than silently proceeding.
             if args.allow_shrink {
                 tracing::warn!(
-                    "--allow-shrink supplied but no comparable previous snapshot exists ({e}); \
-                     flag has no effect — proceeding with first/recovery write"
+                    "snapshot-generate/allow-shrink-noop: --allow-shrink supplied but no \
+                     comparable previous snapshot exists ({e}); flag has no effect — \
+                     proceeding with first/recovery write"
                 );
             } else {
                 tracing::info!(

@@ -117,16 +117,14 @@ export class Sp1TeeStubStack extends cdk.Stack {
             this,
             "SP1_TEE_StubAutoScalingGroup",
             {
-                // Steady state: one t4g.medium serving `/signers`. Roll
-                // headroom: maxCapacity=2 lets a fresh build-on-boot
-                // instance come into service alongside the old one
-                // before the old one drains, paired with
+                // Steady state: one t4g.medium serving `/signers`.
+                // Rolling-update headroom: maxCapacity=2 lets a fresh
+                // build-on-boot instance come into service alongside
+                // the old one before the old one drains, paired with
                 // `minInstancesInService: 1` below. Stub install runs
                 // `cargo install` on aarch64 (~15-25 min on this
                 // instance class), so a strict in-place replacement
-                // would create a 15+ min `/signers` outage; this
-                // policy keeps an old instance serving until the new
-                // one passes ALB health checks.
+                // would create a 15+ min `/signers` outage.
                 minCapacity: 1,
                 desiredCapacity: 1,
                 maxCapacity: 2,
@@ -135,22 +133,29 @@ export class Sp1TeeStubStack extends cdk.Stack {
                 vpcSubnets: {
                     subnetType: cdk.aws_ec2.SubnetType.PUBLIC,
                 },
-                // Block CFN deploy until the instance signals success at the
-                // end of user-data. Timeout sits inside healthCheckGracePeriod
-                // so a stuck install surfaces as a CFN failure before the ASG
-                // starts replacing the instance for ALB-unhealthy reasons.
+                // The rolling-update gate is the cfn-signal sent at
+                // the end of user-data (via `addSignalOnExitCommand`
+                // below), not ALB health — so the old instance keeps
+                // serving until the new one finishes its full
+                // install + binary launch. Timeout 30 min provides
+                // headroom over the upper end of the 15-25 min
+                // install window. healthCheckGracePeriod sits past
+                // the signal timeout so a stuck install surfaces as
+                // a clean CFN failure rather than the ASG racing
+                // ahead to replace the instance for ALB-unhealthy
+                // reasons.
                 signals: cdk.aws_autoscaling.Signals.waitForCount(1, {
-                    timeout: cdk.Duration.minutes(25),
+                    timeout: cdk.Duration.minutes(30),
                 }),
                 healthChecks: cdk.aws_autoscaling.HealthChecks.ec2({
-                    gracePeriod: cdk.Duration.minutes(30),
+                    gracePeriod: cdk.Duration.minutes(35),
                 }),
                 updatePolicy: cdk.aws_autoscaling.UpdatePolicy.rollingUpdate({
                     // Keep at least one instance serving across rolling
                     // updates. Combined with maxCapacity=2 above, this
                     // gives zero-downtime stub updates: new instance
-                    // launches, builds, becomes ALB-healthy, then the
-                    // old one drains.
+                    // launches, completes user-data, sends cfn-signal,
+                    // and only then is the old one drained.
                     minInstancesInService: 1,
                     maxBatchSize: 1,
                     pauseTime: cdk.Duration.minutes(30),

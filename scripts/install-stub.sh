@@ -1,8 +1,26 @@
 #!/bin/bash
 # Install the SP1 TEE signers stub server.
 # Runs as ec2-user (invoked from CDK user-data via `sudo -u ec2-user -H`).
+#
+# Required env vars:
+#   SP1_TEE_SNAPSHOTS_BUCKET - S3 bucket holding the durable signers snapshot.
+#                              Substituted into the systemd unit template
+#                              and consumed by sp1-tee-signers-stub at runtime.
+#   AWS_REGION               - Pinned in the systemd unit so the snapshot S3
+#                              client never falls back to a default region
+#                              when EC2 IMDS is briefly unreachable at boot.
 
 set -euo pipefail
+
+if [ -z "${SP1_TEE_SNAPSHOTS_BUCKET:-}" ]; then
+    echo "install-stub.sh: SP1_TEE_SNAPSHOTS_BUCKET is required" >&2
+    exit 1
+fi
+
+if [ -z "${AWS_REGION:-}" ]; then
+    echo "install-stub.sh: AWS_REGION is required" >&2
+    exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Build deps. Full set so aws-lc-sys / cmake / native-bindgen crates compile
@@ -56,10 +74,17 @@ cargo install --path host \
 
 # ---------------------------------------------------------------------------
 # Install systemd unit.
+#
+# Substitute placeholders in the template with values supplied by CDK
+# user-data. Bucket names ([a-z0-9.-]) and AWS region names ([a-z0-9-])
+# are constrained character sets so `|` as the sed delimiter is safe.
 # ---------------------------------------------------------------------------
-sudo cp sp1-tee-signers-stub.template.service \
-    /etc/systemd/system/sp1-tee-signers-stub.service
+sudo sed \
+    -e "s|__SP1_TEE_SNAPSHOTS_BUCKET__|${SP1_TEE_SNAPSHOTS_BUCKET}|g" \
+    -e "s|__AWS_REGION__|${AWS_REGION}|g" \
+    sp1-tee-signers-stub.template.service \
+    | sudo tee /etc/systemd/system/sp1-tee-signers-stub.service > /dev/null
 
 sudo systemctl enable --now sp1-tee-signers-stub.service
 
-echo "sp1-tee-signers-stub installed."
+echo "sp1-tee-signers-stub installed (snapshots bucket: ${SP1_TEE_SNAPSHOTS_BUCKET}, region: ${AWS_REGION})."

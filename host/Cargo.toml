@@ -23,6 +23,11 @@ name = "sp1-tee-signers-stub"
 path = "bin/signers-stub.rs"
 required-features = ["signers-stub"]
 
+[[bin]]
+name = "sp1-tee-snapshot-generate"
+path = "bin/snapshot-generate.rs"
+required-features = ["signers-stub"]
+
 [[example]]
 name = "fibonacci"
 path = "examples/fibonacci.rs"

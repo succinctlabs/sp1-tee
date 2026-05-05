@@ -1,13 +1,17 @@
-//! HTTP stub serving `/signers` from cached S3 attestations.
+//! HTTP stub serving `/signers` from the durable signers snapshot in S3.
 //!
-//! Mirrors the `/signers` handler in `bin/server.rs` but does NOT start a
-//! Nitro Enclave or accept `/execute` requests. Designed to run on tiny
-//! instances (e.g. Lambda via lambda-web-adapter, or `t4g.nano`) so the
-//! SDK cold-start fetch path stays cheap and reachable while the
-//! production enclave fleet is scaled to zero between SP1 upgrades.
+//! Mirrors the SDK-facing wire format of the original `/signers` handler in
+//! `bin/server.rs` (bincode `Vec<Address>`) but does NOT start a Nitro
+//! Enclave or accept `/execute`/`/address` requests. The serving artifact
+//! is the snapshot written by `sp1-tee-snapshot-generate`, so the stub does
+//! not depend on raw-attestation freshness or on the versioned enclave fleet
+//! being up.
 //!
-//! Anyone with read-only access to the public `sp1-tee-attestations` S3
-//! bucket can run this — no enclave, no signing keys, no secrets needed.
+//! Snapshot is read from a private CDK-managed bucket using ambient AWS
+//! credentials (the EC2 instance role grants scoped `s3:GetObject` on the
+//! snapshot key). The legacy anonymous-read attestations bucket is not
+//! consulted on the steady-state path — the snapshot is the complete trust
+//! artifact.
 
 use axum::{
     body::Bytes,
@@ -18,16 +22,29 @@ use axum::{
 };
 use clap::Parser;
 use sp1_sdk::network::tee::SP1_TEE_VERSION;
+use sp1_tee_host::attestations::read_signers_snapshot;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::net::TcpListener;
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 struct Args {
     #[clap(short, long, default_value = "0.0.0.0")]
     address: String,
 
     #[clap(short, long, default_value = "8080")]
     port: u16,
+
+    /// Snapshots bucket (private, CDK-managed). May also be set via the
+    /// `SP1_TEE_SNAPSHOTS_BUCKET` env var (which is what the systemd unit
+    /// uses in production).
+    #[clap(long, env = "SP1_TEE_SNAPSHOTS_BUCKET")]
+    bucket: String,
+}
+
+#[derive(Clone)]
+struct AppState {
+    bucket: Arc<String>,
 }
 
 #[tokio::main]
@@ -44,9 +61,14 @@ async fn main() {
 
     let args = Args::parse();
 
+    let state = AppState {
+        bucket: Arc::new(args.bucket.clone()),
+    };
+
     let app = Router::new()
         .route("/signers", get(get_signers))
-        .route("/health", get(health));
+        .route("/health", get(health))
+        .with_state(state);
 
     let addr = SocketAddr::new(args.address.parse().expect("Invalid address"), args.port);
 
@@ -54,53 +76,57 @@ async fn main() {
         .await
         .expect("Failed to bind to address");
 
-    tracing::info!("signers-stub listening on {}", addr);
+    tracing::info!(
+        "signers-stub listening on {addr}, snapshot bucket={}",
+        args.bucket
+    );
 
     axum::serve(listener, app.into_make_service())
         .await
         .expect("Server error");
 }
 
+// Process-up health check only. Deliberately does NOT validate snapshot
+// availability — making ALB health depend on snapshot reads would create
+// a replacement loop on cold starts before the snapshot exists, and on
+// any S3 transient. Snapshot freshness/correctness is observed via the
+// stub target group's 5xx rate alarm and a synthetic `/signers` canary
+// (tracked as follow-up; see PR description).
 async fn health() -> &'static str {
     "ok"
 }
 
 #[tracing::instrument(skip_all)]
-async fn get_signers() -> Result<Response, StatusCode> {
-    let raw_attestations = sp1_tee_host::attestations::get_raw_attestations()
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to fetch attestations from S3: {e}");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+async fn get_signers(
+    axum::extract::State(state): axum::extract::State<AppState>,
+) -> Result<Response, StatusCode> {
+    // ETag returned by `read_signers_snapshot` is for the generator's CAS
+    // path; the read-only stub discards it.
+    let (snapshot, _etag) = match read_signers_snapshot(&state.bucket, SP1_TEE_VERSION).await {
+        Ok(pair) => pair,
+        Err(e) => {
+            // Every failure mode (missing/corrupt/oversize/wrong-version/empty)
+            // surfaces as 503. There is intentionally no live-derivation
+            // fallback — the snapshot is the durable serving artifact, and
+            // silently falling back would re-couple `/signers` to raw
+            // attestation freshness.
+            tracing::error!(alert = true, "snapshot read failed: {e}");
+            return Err(StatusCode::SERVICE_UNAVAILABLE);
+        }
+    };
 
-    let total = raw_attestations.len();
-    tracing::debug!("Fetched {} raw attestations", total);
+    tracing::info!(
+        "Serving {} signers from snapshot (sp1_tee_version={}, generated_at_unix={}, source_count={})",
+        snapshot.signers.len(),
+        snapshot.sp1_tee_version,
+        snapshot.generated_at_unix,
+        snapshot.source_count,
+    );
 
-    let signers: Vec<_> = raw_attestations
-        .iter()
-        .filter_map(|raw| sp1_tee_host::attestations::verify_attestation(&raw.attestation).ok())
-        .filter(|doc| {
-            doc.user_data
-                .as_ref()
-                .map(|u| u == &SP1_TEE_VERSION.to_le_bytes())
-                .unwrap_or(false)
-        })
-        .filter_map(|doc| sp1_tee_host::ethereum_address_from_sec1_bytes(doc.public_key.as_ref()?))
-        .collect();
-
-    let skipped = total.saturating_sub(signers.len());
-    if skipped > 0 {
-        tracing::warn!(
-            "Skipped {} of {} attestations (verify failed, version mismatch, or bad pubkey)",
-            skipped,
-            total
-        );
-    }
-
-    tracing::info!("Returning {} signers", signers.len());
-
-    let body = bincode::serialize(&signers).map_err(|e| {
+    // Wire format: bincode::serialize(&Vec<Address>). Identical to the
+    // historical `/signers` response from the versioned enclave fleet, so
+    // SDK clients see no change.
+    let body = bincode::serialize(&snapshot.signers).map_err(|e| {
         tracing::error!("Failed to serialize signers: {e}");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;

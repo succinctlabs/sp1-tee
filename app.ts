@@ -58,6 +58,7 @@ new Sp1TeeVersionedStack(app, `Sp1TeeVersionedStack-${releaseTag}`, {
     role: base.role,
     secret: base.secret,
     alertsTopic: base.alertsTopic,
+    snapshotsBucket: base.snapshotsBucket,
 });
 
 new Sp1TeeStubStack(app, `Sp1TeeStubStack${environment}`, {
@@ -68,4 +69,5 @@ new Sp1TeeStubStack(app, `Sp1TeeStubStack${environment}`, {
     vpc: base.vpc,
     loadBalancer: base.loadBalancer,
     httpsListener: base.httpsListener,
+    snapshotsBucket: base.snapshotsBucket,
 });

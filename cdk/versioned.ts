@@ -1,6 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as actions from "aws-cdk-lib/aws-cloudwatch-actions";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import { Construct } from "constructs";
 import { Environment } from "./base";
 
@@ -15,6 +16,14 @@ export interface Sp1TeeVersionedProps extends cdk.StackProps {
     role: cdk.aws_iam.Role;
     secret: cdk.aws_secretsmanager.ISecret;
     alertsTopic: cdk.aws_sns.Topic;
+    /**
+     * Private snapshots bucket (created in `Sp1TeeBaseStack`). The
+     * `sp1-tee-snapshot-generate` binary running on this host writes the
+     * durable `/signers` snapshot here whenever the operator scales the
+     * versioned ASG up for regeneration. Write+read grant: write to publish,
+     * read for the dry-run path.
+     */
+    snapshotsBucket: s3.IBucket;
 }
 
 // All supported chains
@@ -26,11 +35,23 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
 
         const version = parseInt(props.releaseTag.substring(1));
 
+        // Grant the (shared) base role read+write on the snapshots
+        // bucket. The role already carries `AmazonS3FullAccess` from the
+        // legacy attestations workflow, so functionally this grant is
+        // redundant in steady state. It is kept explicit to document the
+        // generator's required permissions in IaC; if the base role is
+        // ever tightened away from S3FullAccess, the legacy
+        // raw-attestations grants would also need to be made explicit at
+        // the same time (out of scope for this PR).
+        props.snapshotsBucket.grantReadWrite(props.role);
+
         const userData = this.buildUserData(
             props.environment,
             props.releaseTag,
             props.commit,
             props.secret.secretArn,
+            props.snapshotsBucket.bucketName,
+            this.region,
         );
 
         const launchTemplate = new cdk.aws_ec2.LaunchTemplate(
@@ -134,6 +155,8 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
         releaseTag: string,
         commit: string,
         secretArn: string,
+        snapshotsBucket: string,
+        region: string,
     ): cdk.aws_ec2.UserData {
         const userData = cdk.aws_ec2.UserData.forLinux();
 
@@ -162,6 +185,23 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
                 `echo "RPC_URL_${chainId}=$RPC_URL_${chainId}" >> .env`,
             );
         });
+
+        // Persist the snapshots bucket name + AWS region in stable
+        // on-disk locations. Operators running the manual
+        // `sp1-tee-snapshot-generate` step source these into the
+        // generator's environment (see runbook in deploy.yml gate
+        // error). Pinning AWS_REGION explicitly here matches the
+        // stub's systemd unit pin and protects against an EC2 IMDS
+        // hiccup during snapshot generation, which would otherwise
+        // let aws-config silently fall back to a wrong default and
+        // cross-region-redirect on every PutObject (especially
+        // visible on staging in us-west-1).
+        userData.addCommands(
+            "mkdir -p /etc/sp1-tee",
+            `echo '${snapshotsBucket}' > /etc/sp1-tee/snapshots-bucket`,
+            `echo '${region}' > /etc/sp1-tee/aws-region`,
+            "chmod 0644 /etc/sp1-tee/snapshots-bucket /etc/sp1-tee/aws-region",
+        );
 
         // Clone the repo
         userData.addCommands(

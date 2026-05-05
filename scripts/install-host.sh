@@ -40,9 +40,24 @@ if [ "$1" = "--production" ]; then
     # Install the tee server binary.
     cargo install --path host --bin sp1-tee-server --features production
 
+    # Snapshot generator: invoked manually by an operator after this host
+    # has had time to refresh raw attestations. `signers-stub,production`
+    # mirrors the stub host's feature set and pins the production S3
+    # bucket constant; `--no-default-features` drops the Nitro/vsock deps
+    # the generator does not need.
+    cargo install --path host \
+        --bin sp1-tee-snapshot-generate \
+        --no-default-features \
+        --features signers-stub,production
+
     sudo systemctl enable --now tee-service.service
 else
     cargo install --path host --bin sp1-tee-server
+
+    cargo install --path host \
+        --bin sp1-tee-snapshot-generate \
+        --no-default-features \
+        --features signers-stub
 
     sudo systemctl enable --now tee-service.service
 fi

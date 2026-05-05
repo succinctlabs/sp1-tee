@@ -56,10 +56,9 @@ enum GenerateError {
     #[error("snapshot-generate/no-valid-signers: 0 valid signers derived from {0} raw attestations (refusing to overwrite a known-good snapshot)")]
     NoValidSigners(usize),
 
-    #[error("snapshot-generate/read-existing: {0}")]
-    ReadExisting(#[from] sp1_tee_host::attestations::ReadSnapshotError),
-
-    #[error("snapshot-generate/shrink-refused: previous snapshot had {previous} signers, new derivation has {current} (pass --allow-shrink for intentional signer removal)")]
+    #[error("snapshot-generate/shrink-refused: previous snapshot had {previous} signers, new derivation has {current}. \
+        Wait at least one ATTESTATION_INTERVAL (30 min) after host boot so all signers refresh, then re-run. \
+        Pass --allow-shrink only if this is an intentional signer removal (decommission/key rotation)")]
     ShrinkRefused { previous: usize, current: usize },
 
     #[error("snapshot-generate/upload: {0}")]

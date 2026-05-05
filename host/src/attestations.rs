@@ -591,8 +591,8 @@ pub fn build_snapshot(
     signers: Vec<Address>,
     source_count: usize,
 ) -> SignersSnapshot {
-    // Fail-stop on a system clock that's before UNIX_EPOCH. A zero or
-    // negative timestamp would silently flow through to the on-disk
+    // Fail-stop on a system clock that's before UNIX_EPOCH. A zero
+    // (silently-clamped) timestamp would flow through to the on-disk
     // artifact and make later staleness diagnostics lie.
     let generated_at_unix = SystemTime::now()
         .duration_since(UNIX_EPOCH)

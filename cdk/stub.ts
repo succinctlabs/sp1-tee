@@ -39,6 +39,7 @@ export class Sp1TeeStubStack extends cdk.Stack {
         const userData = this.buildUserData(
             props.commit,
             props.snapshotsBucket.bucketName,
+            this.region,
         );
 
         // Dedicated IAM role: only what the stub host actually needs.
@@ -211,7 +212,11 @@ export class Sp1TeeStubStack extends cdk.Stack {
         );
     }
 
-    buildUserData(commit: string, snapshotsBucket: string): cdk.aws_ec2.UserData {
+    buildUserData(
+        commit: string,
+        snapshotsBucket: string,
+        region: string,
+    ): cdk.aws_ec2.UserData {
         const userData = cdk.aws_ec2.UserData.forLinux();
 
         // `sudo -u ec2-user -H` runs install-stub.sh as ec2-user with HOME
@@ -221,10 +226,13 @@ export class Sp1TeeStubStack extends cdk.Stack {
             ? `git checkout --detach ${commit}`
             : "# no commit pin set — leaving default branch checked out";
 
-        // SP1_TEE_SNAPSHOTS_BUCKET is consumed by install-stub.sh, which
-        // substitutes the placeholder in the systemd unit template before
-        // moving it into /etc/systemd/system. The stub binary reads it via
-        // `--bucket`/`SP1_TEE_SNAPSHOTS_BUCKET` env in main().
+        // SP1_TEE_SNAPSHOTS_BUCKET and AWS_REGION are consumed by
+        // install-stub.sh, which substitutes the corresponding
+        // placeholders in the systemd unit template before moving it
+        // into /etc/systemd/system. The stub binary reads
+        // SP1_TEE_SNAPSHOTS_BUCKET via clap's `--bucket`/env attribute;
+        // AWS_REGION feeds aws-config so the snapshot S3 client never
+        // falls back to a wrong default during an IMDS hiccup.
         userData.addCommands(
             "set -euo pipefail",
             "dnf install -y git aws-cfn-bootstrap",
@@ -233,7 +241,7 @@ export class Sp1TeeStubStack extends cdk.Stack {
             "cd sp1-tee",
             checkoutCmd,
             "chown -R ec2-user:ec2-user .",
-            `sudo -u ec2-user -H SP1_TEE_SNAPSHOTS_BUCKET='${snapshotsBucket}' ./scripts/install-stub.sh`,
+            `sudo -u ec2-user -H SP1_TEE_SNAPSHOTS_BUCKET='${snapshotsBucket}' AWS_REGION='${region}' ./scripts/install-stub.sh`,
         );
 
         return userData;

@@ -10,8 +10,11 @@ ExecStart=/home/ec2-user/.cargo/bin/sp1-tee-signers-stub --address 0.0.0.0 --por
 Restart=always
 RestartSec=5s
 Environment=RUST_LOG=info
-# install-stub.sh substitutes __SP1_TEE_SNAPSHOTS_BUCKET__ at deploy time.
+# install-stub.sh substitutes the placeholders at deploy time. AWS_REGION
+# is pinned explicitly so the snapshot S3 client never falls back to a
+# wrong default if EC2 IMDS is briefly unreachable at startup.
 Environment=SP1_TEE_SNAPSHOTS_BUCKET=__SP1_TEE_SNAPSHOTS_BUCKET__
+Environment=AWS_REGION=__AWS_REGION__
 
 [Install]
 WantedBy=multi-user.target

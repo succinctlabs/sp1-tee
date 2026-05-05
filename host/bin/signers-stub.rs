@@ -100,8 +100,10 @@ async fn health() -> &'static str {
 async fn get_signers(
     axum::extract::State(state): axum::extract::State<AppState>,
 ) -> Result<Response, StatusCode> {
-    let snapshot = match read_signers_snapshot(&state.bucket, SP1_TEE_VERSION).await {
-        Ok(s) => s,
+    // ETag returned by `read_signers_snapshot` is for the generator's CAS
+    // path; the read-only stub discards it.
+    let (snapshot, _etag) = match read_signers_snapshot(&state.bucket, SP1_TEE_VERSION).await {
+        Ok(pair) => pair,
         Err(e) => {
             // Every failure mode (missing/corrupt/oversize/wrong-version/empty)
             // surfaces as 503. There is intentionally no live-derivation

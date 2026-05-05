@@ -109,8 +109,17 @@ async fn main() -> Result<(), GenerateError> {
     // (corrupt / schema bump / version mismatch / empty) are intentionally
     // treated as "no comparable previous snapshot, write fresh" — those
     // are the cases the operator actually wants to recover from.
-    match sp1_tee_host::attestations::read_signers_snapshot(&args.bucket, SP1_TEE_VERSION).await {
-        Ok(previous) => {
+    //
+    // The ETag from a successful read is threaded into write_signers_snapshot
+    // as `If-Match` so a concurrent writer between this read and our write
+    // is rejected with PreconditionFailed instead of silently clobbered.
+    let expected_etag: Option<String> = match sp1_tee_host::attestations::read_signers_snapshot(
+        &args.bucket,
+        SP1_TEE_VERSION,
+    )
+    .await
+    {
+        Ok((previous, etag)) => {
             if previous.signers.len() > signers.len() && !args.allow_shrink {
                 return Err(GenerateError::ShrinkRefused {
                     previous: previous.signers.len(),
@@ -118,17 +127,20 @@ async fn main() -> Result<(), GenerateError> {
                 });
             }
             tracing::info!(
-                "previous snapshot had {} signers; proceeding (allow_shrink={})",
+                "previous snapshot had {} signers (etag={:?}); proceeding (allow_shrink={})",
                 previous.signers.len(),
+                etag,
                 args.allow_shrink,
             );
+            etag
         }
         Err(e) => {
             tracing::info!(
-                "no comparable previous snapshot ({e}); proceeding without shrink check"
+                "no comparable previous snapshot ({e}); proceeding without shrink check or If-Match"
             );
+            None
         }
-    }
+    };
 
     let snapshot =
         sp1_tee_host::attestations::build_snapshot(SP1_TEE_VERSION, signers, source_count);
@@ -138,17 +150,23 @@ async fn main() -> Result<(), GenerateError> {
     if args.dry_run {
         let body = bincode::serialize(&snapshot).expect("snapshot serialization is infallible");
         tracing::info!(
-            "dry-run: would write {} bytes ({} signers, source_count={}) to {}/{}",
+            "dry-run: would write {} bytes ({} signers, source_count={}, if_match={:?}) to {}/{}",
             body.len(),
             snapshot.signers.len(),
             snapshot.source_count,
+            expected_etag,
             args.bucket,
             key,
         );
         return Ok(());
     }
 
-    sp1_tee_host::attestations::write_signers_snapshot(&args.bucket, &snapshot).await?;
+    sp1_tee_host::attestations::write_signers_snapshot(
+        &args.bucket,
+        &snapshot,
+        expected_etag.as_deref(),
+    )
+    .await?;
     tracing::info!(
         "wrote snapshot to {}/{} ({} signers, generated_at_unix={})",
         args.bucket,

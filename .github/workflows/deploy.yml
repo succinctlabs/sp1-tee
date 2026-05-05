@@ -78,12 +78,14 @@ jobs:
                   # trigger filter (v[0-9]+ / v[0-9]+-staging) accepts
                   # most well-formed tags, but the snapshot-existence
                   # gate later in this job parses the version number
-                  # from the tag with sed. Reject anything that doesn't
-                  # match so a typo'd tag fails fast with a clear error
-                  # instead of producing a confusing missing-snapshot
-                  # message downstream.
-                  if [[ ! "${{ github.ref_name }}" =~ ^v[0-9]+(-staging)?$ ]]; then
-                      echo "::error::Release tag ${{ github.ref_name }} does not match ^v[0-9]+(-staging)?$"
+                  # from the tag with sed and the generator writes
+                  # `signers-v{N}.bin` from a u32 constant. Reject
+                  # leading-zero forms (`v01`, `v00`) so the tag's
+                  # version number is unambiguous and matches the key
+                  # the generator produces.
+                  if [[ ! "${{ github.ref_name }}" =~ ^v(0|[1-9][0-9]*)(-staging)?$ ]]; then
+                      echo "::error::Release tag ${{ github.ref_name }} does not match ^v(0|[1-9][0-9]*)(-staging)?$"
+                      echo "::error::(leading zeros rejected: 'v01' would desync from generator's 'signers-v1.bin')"
                       exit 1
                   fi
                   if [[ ${{ github.ref_name }} == *staging* ]]; then
@@ -188,19 +190,34 @@ jobs:
                   VERSION=$(echo "${{ env.RELEASE_TAG }}" | sed -E 's/^v([0-9]+).*$/\1/')
                   KEY="signers-v${VERSION}.bin"
 
-                  # Distinguish "snapshot is missing" (404 / NoSuchKey) from
-                  # any other AWS error (IAM drift, throttle, region
-                  # mismatch). The former is an expected first-deploy
-                  # condition with a known runbook; the latter sends
-                  # operators down the wrong remediation path.
+                  # Use list-objects-v2 instead of head-object: a successful
+                  # call returning empty `Contents` cleanly distinguishes
+                  # "object missing" from "AWS error" (IAM drift, throttle,
+                  # region mismatch) without parsing localized stderr.
                   set +e
-                  HEAD_OUTPUT=$(aws s3api head-object --bucket "$BUCKET" --key "$KEY" 2>&1)
-                  HEAD_STATUS=$?
+                  LIST_OUTPUT=$(aws s3api list-objects-v2 \
+                      --bucket "$BUCKET" \
+                      --prefix "$KEY" \
+                      --max-keys 1 \
+                      --output json 2>&1)
+                  LIST_STATUS=$?
                   set -e
 
-                  if [ $HEAD_STATUS -eq 0 ]; then
+                  if [ $LIST_STATUS -ne 0 ]; then
+                    echo "::error::list-objects-v2 on $BUCKET prefix $KEY failed:"
+                    echo "::error::$LIST_OUTPUT"
+                    echo "::error::This is NOT the missing-snapshot path — likely IAM"
+                    echo "::error::(missing s3:ListBucket on the deploy role), region, or"
+                    echo "::error::throttling. Do NOT run snapshot-generate; investigate"
+                    echo "::error::the AWS error first."
+                    exit 1
+                  fi
+
+                  FOUND=$(echo "$LIST_OUTPUT" | jq -r --arg k "$KEY" '.Contents[]?.Key | select(. == $k)')
+
+                  if [ -n "$FOUND" ]; then
                     echo "Snapshot $BUCKET/$KEY found; safe to deploy Stub Stack."
-                  elif echo "$HEAD_OUTPUT" | grep -qE '(Not Found|404|NoSuchKey)'; then
+                  else
                     echo "::error::Snapshot $BUCKET/$KEY not found."
                     echo "::error::This is expected on the first deploy of a new SP1_TEE_VERSION."
                     echo "::error::Runbook to recover:"
@@ -216,12 +233,6 @@ jobs:
                     echo "::error::      --query AutoScalingGroups[0].Instances' returns [] — terminating"
                     echo "::error::      instances would race with the re-run's cdk deploy on Versioned."
                     echo "::error::  5) Re-run failed jobs in the GitHub Actions UI."
-                    exit 1
-                  else
-                    echo "::error::head-object on $BUCKET/$KEY failed with a non-404 error:"
-                    echo "::error::$HEAD_OUTPUT"
-                    echo "::error::This is NOT the missing-snapshot path — likely IAM, region, or"
-                    echo "::error::throttling. Do NOT run snapshot-generate; investigate the AWS error first."
                     exit 1
                   fi
 

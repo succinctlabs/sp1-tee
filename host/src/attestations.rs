@@ -497,6 +497,17 @@ pub enum WriteSnapshotError {
     #[error("Failed to encode snapshot: {0}")]
     Encode(#[from] bincode::Error),
 
+    #[error(
+        "If-Match precondition failed for snapshot {bucket}/{key} (expected ETag {expected_etag}). \
+        Another writer updated the snapshot between this run's read and write — re-read the latest, \
+        re-evaluate shrink protection, and retry"
+    )]
+    PreconditionFailed {
+        bucket: String,
+        key: String,
+        expected_etag: String,
+    },
+
     #[error("Failed to PutObject snapshot {bucket}/{key}: {source:?}")]
     S3PutObject {
         bucket: String,
@@ -537,15 +548,22 @@ pub fn decode_and_validate_snapshot(
 
 /// Read the durable `/signers` snapshot from the dedicated snapshots bucket.
 ///
-/// Returns the decoded [`SignersSnapshot`] after validating schema_version,
-/// sp1_tee_version, and a non-empty signer list. There is intentionally no
-/// fallback to live derivation: missing/corrupt/wrong-version/empty all
-/// surface as errors so the stub can return a clear 503.
+/// Returns the decoded [`SignersSnapshot`] paired with the S3 object's
+/// ETag, after validating schema_version, sp1_tee_version, and a
+/// non-empty signer list. There is intentionally no fallback to live
+/// derivation: missing/corrupt/wrong-version/empty all surface as errors
+/// so the stub can return a clear 503.
+///
+/// The ETag is what the generator passes back to
+/// [`write_signers_snapshot`] as a CAS precondition (see `--allow-shrink`
+/// flow), so a concurrent writer between this read and the next write is
+/// surfaced as a `PreconditionFailed` error rather than a silent clobber.
+/// Read-only callers (the stub) discard the ETag.
 #[allow(clippy::result_large_err)]
 pub async fn read_signers_snapshot(
     bucket: &str,
     expected_sp1_tee_version: u32,
-) -> Result<SignersSnapshot, ReadSnapshotError> {
+) -> Result<(SignersSnapshot, Option<String>), ReadSnapshotError> {
     let client = s3_client_for_snapshots().await;
     let key = snapshot_key(expected_sp1_tee_version);
 
@@ -568,6 +586,8 @@ pub async fn read_signers_snapshot(
         }
     };
 
+    let etag = object.e_tag().map(|s| s.to_string());
+
     if let Some(len) = object.content_length() {
         if len > MAX_SNAPSHOT_BYTES as i64 {
             return Err(ReadSnapshotError::TooLarge { size: len as usize });
@@ -579,7 +599,8 @@ pub async fn read_signers_snapshot(
         return Err(ReadSnapshotError::TooLarge { size: bytes.len() });
     }
 
-    decode_and_validate_snapshot(&bytes, expected_sp1_tee_version)
+    let snapshot = decode_and_validate_snapshot(&bytes, expected_sp1_tee_version)?;
+    Ok((snapshot, etag))
 }
 
 /// Build a [`SignersSnapshot`] from a verified signer list, stamping the
@@ -610,12 +631,18 @@ pub fn build_snapshot(
 /// Write a fresh snapshot to S3.
 ///
 /// Refuses to write if the snapshot's signer list is empty — defense in
-/// depth against `/signers` regressing to a known-bad state. Idempotent:
-/// repeated calls overwrite the same key with the latest body.
+/// depth against `/signers` regressing to a known-bad state. When
+/// `expected_etag` is `Some`, sends `If-Match: <etag>` so a concurrent
+/// writer between the caller's read and this write is rejected with
+/// `PreconditionFailed` (412) rather than silently clobbering the
+/// snapshot. When `None`, no precondition is sent — used for the
+/// "no comparable previous snapshot" path (first deploy, recovery from
+/// corrupt/empty/wrong-version states).
 #[allow(clippy::result_large_err)]
 pub async fn write_signers_snapshot(
     bucket: &str,
     snapshot: &SignersSnapshot,
+    expected_etag: Option<&str>,
 ) -> Result<(), WriteSnapshotError> {
     if snapshot.signers.is_empty() {
         return Err(WriteSnapshotError::NoValidSigners {
@@ -625,18 +652,35 @@ pub async fn write_signers_snapshot(
     let body = bincode::serialize(snapshot)?;
     let client = s3_client_for_snapshots().await;
     let key = snapshot_key(snapshot.sp1_tee_version);
-    client
+    let mut put = client
         .put_object()
         .bucket(bucket)
         .key(&key)
-        .body(body.into())
-        .send()
-        .await
-        .map_err(|e| WriteSnapshotError::S3PutObject {
+        .body(body.into());
+    if let Some(etag) = expected_etag {
+        put = put.if_match(etag);
+    }
+    put.send().await.map_err(|e| {
+        // Map a 412 PreconditionFailed (sent only when expected_etag
+        // is Some) to a dedicated variant so the operator-facing
+        // message points at the concurrent-writer recovery action.
+        // S3's PreconditionFailed surfaces via SdkError::ServiceError
+        // with status 412 on the raw HTTP response.
+        if let (Some(etag), SdkError::ServiceError(svc)) = (expected_etag, &e) {
+            if svc.raw().status().as_u16() == 412 {
+                return WriteSnapshotError::PreconditionFailed {
+                    bucket: bucket.to_string(),
+                    key: key.clone(),
+                    expected_etag: etag.to_string(),
+                };
+            }
+        }
+        WriteSnapshotError::S3PutObject {
             bucket: bucket.to_string(),
             key,
             source: e,
-        })?;
+        }
+    })?;
     Ok(())
 }
 

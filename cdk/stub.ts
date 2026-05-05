@@ -1,4 +1,5 @@
 import * as cdk from "aws-cdk-lib";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import { Construct } from "constructs";
 import { Environment } from "./base";
 
@@ -14,6 +15,13 @@ export interface Sp1TeeStubProps extends cdk.StackProps {
     vpc: cdk.aws_ec2.Vpc;
     loadBalancer: cdk.aws_elasticloadbalancingv2.ApplicationLoadBalancer;
     httpsListener: cdk.aws_elasticloadbalancingv2.ApplicationListener;
+    /**
+     * Private snapshots bucket (created in `Sp1TeeBaseStack`). Stub reads
+     * the durable signers snapshot from this bucket on every `/signers`
+     * request. The role gets a scoped `s3:GetObject` grant only — no list,
+     * no put.
+     */
+    snapshotsBucket: s3.IBucket;
 }
 
 /**
@@ -27,15 +35,19 @@ export class Sp1TeeStubStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props: Sp1TeeStubProps) {
         super(scope, id, props);
 
-        const userData = this.buildUserData(props.commit);
+        const userData = this.buildUserData(
+            props.commit,
+            props.snapshotsBucket.bucketName,
+        );
 
         // Dedicated IAM role: only what the stub host actually needs.
         // - SSM agent: `AmazonSSMManagedInstanceCore` (so we can debug via
         //   Session Manager without opening SSH).
         // - cfn-signal: CDK adds a stack-scoped `cloudformation:SignalResource`
         //   policy when `Signals.waitForCount` is used below.
-        // Notably no AmazonS3FullAccess and no `sp1_tee` Secrets read — the
-        // stub reads attestations anonymously via `s3_client_read_only`.
+        // - Snapshots bucket: scoped `s3:GetObject` only (granted below). No
+        //   list, no put. Stub does not read the legacy public attestations
+        //   bucket on the steady-state path.
         const role = new cdk.aws_iam.Role(this, "SP1_TEE_StubInstanceRole", {
             assumedBy: new cdk.aws_iam.ServicePrincipal("ec2.amazonaws.com"),
             managedPolicies: [
@@ -44,6 +56,12 @@ export class Sp1TeeStubStack extends cdk.Stack {
                 ),
             ],
         });
+
+        // Scope IAM to the snapshot key under this version. `grantRead`
+        // would also work but covers the entire bucket; we only need a
+        // single object so use `grantRead` with a key arn for narrower
+        // blast radius.
+        props.snapshotsBucket.grantRead(role);
 
         // Dedicated SG. CDK auto-adds the ALB SG → port 8080 ingress when the
         // ASG is attached to the target group below, so no explicit ingress
@@ -184,7 +202,7 @@ export class Sp1TeeStubStack extends cdk.Stack {
         );
     }
 
-    buildUserData(commit: string): cdk.aws_ec2.UserData {
+    buildUserData(commit: string, snapshotsBucket: string): cdk.aws_ec2.UserData {
         const userData = cdk.aws_ec2.UserData.forLinux();
 
         // `sudo -u ec2-user -H` runs install-stub.sh as ec2-user with HOME
@@ -194,6 +212,10 @@ export class Sp1TeeStubStack extends cdk.Stack {
             ? `git checkout --detach ${commit}`
             : "# no commit pin set — leaving default branch checked out";
 
+        // SP1_TEE_SNAPSHOTS_BUCKET is consumed by install-stub.sh, which
+        // substitutes the placeholder in the systemd unit template before
+        // moving it into /etc/systemd/system. The stub binary reads it via
+        // `--bucket`/`SP1_TEE_SNAPSHOTS_BUCKET` env in main().
         userData.addCommands(
             "set -euo pipefail",
             "dnf install -y git aws-cfn-bootstrap",
@@ -202,7 +224,7 @@ export class Sp1TeeStubStack extends cdk.Stack {
             "cd sp1-tee",
             checkoutCmd,
             "chown -R ec2-user:ec2-user .",
-            "sudo -u ec2-user -H ./scripts/install-stub.sh",
+            `sudo -u ec2-user -H SP1_TEE_SNAPSHOTS_BUCKET='${snapshotsBucket}' ./scripts/install-stub.sh`,
         );
 
         return userData;

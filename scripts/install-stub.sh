@@ -1,8 +1,18 @@
 #!/bin/bash
 # Install the SP1 TEE signers stub server.
 # Runs as ec2-user (invoked from CDK user-data via `sudo -u ec2-user -H`).
+#
+# Required env vars:
+#   SP1_TEE_SNAPSHOTS_BUCKET - S3 bucket holding the durable signers snapshot.
+#                              Substituted into the systemd unit template
+#                              and consumed by sp1-tee-signers-stub at runtime.
 
 set -euo pipefail
+
+if [ -z "${SP1_TEE_SNAPSHOTS_BUCKET:-}" ]; then
+    echo "install-stub.sh: SP1_TEE_SNAPSHOTS_BUCKET is required" >&2
+    exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Build deps. Full set so aws-lc-sys / cmake / native-bindgen crates compile
@@ -56,10 +66,16 @@ cargo install --path host \
 
 # ---------------------------------------------------------------------------
 # Install systemd unit.
+#
+# The template carries `Environment=SP1_TEE_SNAPSHOTS_BUCKET=__SP1_TEE_SNAPSHOTS_BUCKET__`;
+# substitute the placeholder with the bucket name supplied by CDK user-data.
+# Bucket names are limited to [a-z0-9.-] so escaping with `|` as the sed
+# delimiter is sufficient (no embedded metacharacters in practice).
 # ---------------------------------------------------------------------------
-sudo cp sp1-tee-signers-stub.template.service \
-    /etc/systemd/system/sp1-tee-signers-stub.service
+sudo sed "s|__SP1_TEE_SNAPSHOTS_BUCKET__|${SP1_TEE_SNAPSHOTS_BUCKET}|g" \
+    sp1-tee-signers-stub.template.service \
+    | sudo tee /etc/systemd/system/sp1-tee-signers-stub.service > /dev/null
 
 sudo systemctl enable --now sp1-tee-signers-stub.service
 
-echo "sp1-tee-signers-stub installed."
+echo "sp1-tee-signers-stub installed (snapshots bucket: ${SP1_TEE_SNAPSHOTS_BUCKET})."

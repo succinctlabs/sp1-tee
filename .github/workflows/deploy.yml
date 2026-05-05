@@ -126,13 +126,67 @@ jobs:
                     cdk deploy Sp1TeeBaseStack-staging --require-approval never
                   else
                     cdk deploy Sp1TeeBaseStack --require-approval never
-                  fi               
+                  fi
 
-            # Stub Stack must deploy BEFORE Versioned Stack: this ensures the
-            # priority-30 `/signers` rule is in place before the versioned ASG
-            # scales to zero (idle), so SDK clients fetching `/signers` are
-            # served by the stub throughout the rollout — no `/signers` outage
-            # window mid-deploy.
+            # Versioned Stack deploys before Stub Stack so the
+            # `sp1-tee-snapshot-generate` binary is installed on the
+            # versioned host before the snapshot existence gate runs.
+            # The priority-30 `/signers` listener rule was already
+            # deployed in a prior phase, so re-deploying Versioned before
+            # Stub does not introduce a `/signers` routing gap.
+            - name: Deploy Versioned Stack
+              run: |
+                  cdk deploy Sp1TeeVersionedStack-${{ env.RELEASE_TAG }} --require-approval never
+
+            # Snapshot existence gate. Stub Stack's `/signers` handler reads
+            # from `signers-v{N}.bin` in the private snapshots bucket; if the
+            # object doesn't exist yet, deploying the new stub binary would
+            # cause `/signers` to return 503 until an operator manually runs
+            # `sp1-tee-snapshot-generate`.
+            #
+            # First deploy of the snapshot architecture (or any future
+            # `SP1_TEE_VERSION` bump) requires the operator to:
+            #   1. Scale Versioned ASG to desired=1 (temporarily)
+            #   2. Wait for fresh raw attestations (~5-10 min)
+            #   3. SSM-exec `sp1-tee-snapshot-generate` on the host
+            #   4. Scale ASG back to desired=0
+            #   5. Re-run this failed job in GitHub Actions
+            #
+            # On subsequent retags the snapshot persists, so this gate is a
+            # cheap no-op.
+            - name: Verify snapshot object exists before deploying Stub
+              run: |
+                  set -euo pipefail
+                  if [ "${{ steps.env.outputs.environment }}" = "staging" ]; then
+                    STACK_NAME="Sp1TeeBaseStack-staging"
+                    EXPORT_NAME="Sp1TeeSignersSnapshotsBucketName-staging"
+                  else
+                    STACK_NAME="Sp1TeeBaseStack"
+                    EXPORT_NAME="Sp1TeeSignersSnapshotsBucketName"
+                  fi
+                  BUCKET=$(aws cloudformation describe-stacks \
+                    --stack-name "$STACK_NAME" \
+                    --query "Stacks[0].Outputs[?ExportName=='$EXPORT_NAME'].OutputValue" \
+                    --output text)
+                  if [ -z "$BUCKET" ]; then
+                    echo "::error::Could not resolve snapshots bucket name from $STACK_NAME / $EXPORT_NAME"
+                    exit 1
+                  fi
+                  VERSION=$(echo "${{ env.RELEASE_TAG }}" | sed -E 's/^v([0-9]+).*$/\1/')
+                  KEY="signers-v${VERSION}.bin"
+                  if aws s3api head-object --bucket "$BUCKET" --key "$KEY" >/dev/null 2>&1; then
+                    echo "Snapshot $BUCKET/$KEY found; safe to deploy Stub Stack."
+                  else
+                    echo "::error::Snapshot $BUCKET/$KEY not found."
+                    echo "::error::Run sp1-tee-snapshot-generate on the versioned host before retrying:"
+                    echo "::error::  1) Scale Sp1TeeVersionedStack-${{ env.RELEASE_TAG }} ASG to desired=1"
+                    echo "::error::  2) Wait for fresh raw attestations (~5-10 min)"
+                    echo "::error::  3) SSM-exec sp1-tee-snapshot-generate on the host"
+                    echo "::error::  4) Scale ASG back to desired=0"
+                    echo "::error::  5) Re-run this failed job"
+                    exit 1
+                  fi
+
             - name: Deploy Stub Stack
               run: |
                   if [ "${{ steps.env.outputs.environment }}" = "staging" ]; then
@@ -140,7 +194,3 @@ jobs:
                   else
                     cdk deploy Sp1TeeStubStack --require-approval never
                   fi
-
-            - name: Deploy Versioned Stack
-              run: |
-                  cdk deploy Sp1TeeVersionedStack-${{ env.RELEASE_TAG }} --require-approval never

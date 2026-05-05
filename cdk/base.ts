@@ -2,6 +2,7 @@ import * as cdk from "aws-cdk-lib";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import * as sns from "aws-cdk-lib/aws-sns";
 import * as snsSubscriptions from "aws-cdk-lib/aws-sns-subscriptions";
 import { Construct } from "constructs";
@@ -27,6 +28,7 @@ export class Sp1TeeBaseStack extends cdk.Stack {
     public readonly role: cdk.aws_iam.Role;
     public readonly secret: cdk.aws_secretsmanager.ISecret;
     public readonly alertsTopic: cdk.aws_sns.Topic;
+    public readonly snapshotsBucket: s3.Bucket;
 
     constructor(scope: Construct, id: string, props: Sp1TeeBaseProps) {
         super(scope, id, props);
@@ -45,6 +47,40 @@ export class Sp1TeeBaseStack extends cdk.Stack {
             {
                 displayName: "SP1 TEE Health Alerts",
                 topicName: "sp1-tee-health-alerts",
+            },
+        );
+
+        // Durable serving artifact for `/signers`. Stored in a private,
+        // CDK-managed bucket — separate from the legacy public
+        // `sp1-tee-attestations` bucket whose objects are subject to a
+        // 1-day lifecycle expiry. The snapshots bucket has no lifecycle
+        // rule, so the snapshot persists indefinitely until the
+        // `sp1-tee-snapshot-generate` binary overwrites it. RemovalPolicy
+        // RETAIN guards against accidental destroy losing the artifact
+        // that `/signers` depends on.
+        this.snapshotsBucket = new s3.Bucket(
+            this,
+            `SP1_TEE_SignersSnapshotsBucket${props.environment}`,
+            {
+                blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+                encryption: s3.BucketEncryption.S3_MANAGED,
+                versioned: true,
+                enforceSSL: true,
+                removalPolicy: cdk.RemovalPolicy.RETAIN,
+                autoDeleteObjects: false,
+            },
+        );
+
+        // Stable Output so deploy.yml's pre-Stub snapshot existence check
+        // can resolve the bucket name without hardcoding it.
+        new cdk.CfnOutput(
+            this,
+            `SP1_TEE_SignersSnapshotsBucketName${props.environment}`,
+            {
+                value: this.snapshotsBucket.bucketName,
+                exportName: `Sp1TeeSignersSnapshotsBucketName${props.environment}`,
+                description:
+                    "Name of the private S3 bucket holding the durable /signers snapshot artifact.",
             },
         );
 

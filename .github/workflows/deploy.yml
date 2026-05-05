@@ -73,6 +73,19 @@ jobs:
             - name: Retrieve the env variables
               id: env
               run: |
+                  set -euo pipefail
+                  # Validate the release tag format up front. The push
+                  # trigger filter (v[0-9]+ / v[0-9]+-staging) accepts
+                  # most well-formed tags, but the snapshot-existence
+                  # gate later in this job parses the version number
+                  # from the tag with sed. Reject anything that doesn't
+                  # match so a typo'd tag fails fast with a clear error
+                  # instead of producing a confusing missing-snapshot
+                  # message downstream.
+                  if [[ ! "${{ github.ref_name }}" =~ ^v[0-9]+(-staging)?$ ]]; then
+                      echo "::error::Release tag ${{ github.ref_name }} does not match ^v[0-9]+(-staging)?$"
+                      exit 1
+                  fi
                   if [[ ${{ github.ref_name }} == *staging* ]]; then
                       echo "environment=staging" >> $GITHUB_OUTPUT
                       echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_STAGING }}" >> $GITHUB_ENV
@@ -174,16 +187,37 @@ jobs:
                   fi
                   VERSION=$(echo "${{ env.RELEASE_TAG }}" | sed -E 's/^v([0-9]+).*$/\1/')
                   KEY="signers-v${VERSION}.bin"
-                  if aws s3api head-object --bucket "$BUCKET" --key "$KEY" >/dev/null 2>&1; then
+
+                  # Distinguish "snapshot is missing" (404 / NoSuchKey) from
+                  # any other AWS error (IAM drift, throttle, region
+                  # mismatch). The former is an expected first-deploy
+                  # condition with a known runbook; the latter sends
+                  # operators down the wrong remediation path.
+                  set +e
+                  HEAD_OUTPUT=$(aws s3api head-object --bucket "$BUCKET" --key "$KEY" 2>&1)
+                  HEAD_STATUS=$?
+                  set -e
+
+                  if [ $HEAD_STATUS -eq 0 ]; then
                     echo "Snapshot $BUCKET/$KEY found; safe to deploy Stub Stack."
-                  else
+                  elif echo "$HEAD_OUTPUT" | grep -qE '(Not Found|404|NoSuchKey)'; then
                     echo "::error::Snapshot $BUCKET/$KEY not found."
+                    echo "::error::This is expected on the first deploy of a new SP1_TEE_VERSION."
                     echo "::error::Run sp1-tee-snapshot-generate on the versioned host before retrying:"
                     echo "::error::  1) Scale Sp1TeeVersionedStack-${{ env.RELEASE_TAG }} ASG to desired=1"
                     echo "::error::  2) Wait for fresh raw attestations (~5-10 min)"
                     echo "::error::  3) SSM-exec sp1-tee-snapshot-generate on the host"
-                    echo "::error::  4) Scale ASG back to desired=0"
-                    echo "::error::  5) Re-run this failed job"
+                    echo "::error::     (reads SP1_TEE_SNAPSHOTS_BUCKET from /etc/sp1-tee/snapshots-bucket)"
+                    echo "::error::  4) IMPORTANT: scale ASG back to desired=0 BEFORE re-running this job"
+                    echo "::error::     (re-running this job re-invokes 'cdk deploy' on the Versioned"
+                    echo "::error::     stack, which would race with a still-running enclave host)"
+                    echo "::error::  5) Re-run failed jobs in the GitHub Actions UI"
+                    exit 1
+                  else
+                    echo "::error::head-object on $BUCKET/$KEY failed with a non-404 error:"
+                    echo "::error::$HEAD_OUTPUT"
+                    echo "::error::This is NOT the missing-snapshot path — likely IAM, region, or"
+                    echo "::error::throttling. Do NOT run snapshot-generate; investigate the AWS error first."
                     exit 1
                   fi
 

@@ -68,12 +68,10 @@ pub fn snapshot_key(version: u32) -> String {
     format!("signers-v{version}.bin")
 }
 
-/// Creates an S3 client from the environment variables.
-///
-/// For EC2 instances, the environment variables are set automatically.
-/// Used for both legacy raw-attestation writes and the durable snapshots
-/// bucket (read+write); both buckets live in the same region and share
-/// the same EC2 instance role.
+/// Authenticated S3 client pinned to us-east-1, used for the legacy
+/// `sp1-tee-attestations` bucket which lives in that region. Snapshot
+/// reads and writes use [`s3_client_for_snapshots`] instead so they pick
+/// up the deployment's ambient region (staging is `us-west-1`).
 ///
 /// # Panics
 ///
@@ -81,7 +79,7 @@ pub fn snapshot_key(version: u32) -> String {
 pub(crate) async fn s3_client_write() -> aws_sdk_s3::Client {
     // Loads from environment variables.
     let aws_config = aws_config::defaults(BehaviorVersion::latest())
-        // buckets are in us-east-1
+        // legacy raw-attestations bucket is in us-east-1
         .region(Region::new("us-east-1"))
         .load()
         .await;
@@ -94,13 +92,22 @@ pub(crate) async fn s3_client_write() -> aws_sdk_s3::Client {
 pub(crate) async fn s3_client_read_only() -> aws_sdk_s3::Client {
     // Loads from environment variables.
     let aws_config = aws_config::defaults(BehaviorVersion::latest())
-        // buckets are in us-east-1
+        // legacy raw-attestations bucket is in us-east-1
         .region(Region::new("us-east-1"))
         .no_credentials()
         .load()
         .await;
 
     // Create the S3 client.
+    aws_sdk_s3::Client::new(&aws_config)
+}
+
+/// Authenticated S3 client for the durable snapshots bucket. Region is
+/// resolved from the ambient AWS environment (EC2 instance metadata or
+/// `AWS_REGION`) so the same code path works for prod (us-east-1) and
+/// staging (us-west-1) without recompiling.
+pub(crate) async fn s3_client_for_snapshots() -> aws_sdk_s3::Client {
+    let aws_config = aws_config::defaults(BehaviorVersion::latest()).load().await;
     aws_sdk_s3::Client::new(&aws_config)
 }
 
@@ -539,7 +546,7 @@ pub async fn read_signers_snapshot(
     bucket: &str,
     expected_sp1_tee_version: u32,
 ) -> Result<SignersSnapshot, ReadSnapshotError> {
-    let client = s3_client_write().await;
+    let client = s3_client_for_snapshots().await;
     let key = snapshot_key(expected_sp1_tee_version);
 
     let object = match client.get_object().bucket(bucket).key(&key).send().await {
@@ -584,10 +591,13 @@ pub fn build_snapshot(
     signers: Vec<Address>,
     source_count: usize,
 ) -> SignersSnapshot {
+    // Fail-stop on a system clock that's before UNIX_EPOCH. A zero or
+    // negative timestamp would silently flow through to the on-disk
+    // artifact and make later staleness diagnostics lie.
     let generated_at_unix = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+        .expect("system clock is before UNIX_EPOCH")
+        .as_secs();
     SignersSnapshot {
         schema_version: SNAPSHOT_SCHEMA_VERSION,
         sp1_tee_version,
@@ -613,7 +623,7 @@ pub async fn write_signers_snapshot(
         });
     }
     let body = bincode::serialize(snapshot)?;
-    let client = s3_client_write().await;
+    let client = s3_client_for_snapshots().await;
     let key = snapshot_key(snapshot.sp1_tee_version);
     client
         .put_object()
@@ -669,6 +679,30 @@ mod tests {
     fn decode_rejects_corrupt_bytes() {
         let result = decode_and_validate_snapshot(b"not a snapshot", 1);
         assert!(matches!(result, Err(ReadSnapshotError::Decode(_))));
+    }
+
+    #[test]
+    fn decode_rejects_truncated_bytes_at_every_length() {
+        // Models a partially-delivered S3 GetObject (interrupted transfer
+        // or chunked-transfer truncation). bincode::deserialize must
+        // surface a clean Decode error at every truncation length, never
+        // panic.
+        let original = snapshot_with(
+            vec![
+                sample_signer(),
+                address!("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+            ],
+            1,
+        );
+        let bytes = bincode::serialize(&original).unwrap();
+        for cut in 0..bytes.len() {
+            let truncated = &bytes[..cut];
+            let result = decode_and_validate_snapshot(truncated, 1);
+            assert!(
+                matches!(result, Err(ReadSnapshotError::Decode(_))),
+                "truncation at length {cut} should produce Decode error, got {result:?}"
+            );
+        }
     }
 
     #[test]

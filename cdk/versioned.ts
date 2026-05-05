@@ -35,12 +35,14 @@ export class Sp1TeeVersionedStack extends cdk.Stack {
 
         const version = parseInt(props.releaseTag.substring(1));
 
-        // Grant the (shared) base role both read and write on the
-        // snapshots bucket. The base role already carries
-        // `AmazonS3FullAccess` from the legacy attestations workflow, so
-        // this scoped grant is additive but explicit — keeps the intent
-        // visible in IaC and survives a future tightening of the base
-        // role.
+        // Grant the (shared) base role read+write on the snapshots
+        // bucket. The role already carries `AmazonS3FullAccess` from the
+        // legacy attestations workflow, so functionally this grant is
+        // redundant in steady state. It is kept explicit to document the
+        // generator's required permissions in IaC; if the base role is
+        // ever tightened away from S3FullAccess, the legacy
+        // raw-attestations grants would also need to be made explicit at
+        // the same time (out of scope for this PR).
         props.snapshotsBucket.grantReadWrite(props.role);
 
         const userData = this.buildUserData(

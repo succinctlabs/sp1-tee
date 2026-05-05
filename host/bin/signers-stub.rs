@@ -8,10 +8,10 @@
 //! being up.
 //!
 //! Snapshot is read from a private CDK-managed bucket using ambient AWS
-//! credentials (the EC2 instance role grants `s3:GetObject` on the snapshot
-//! key). Reads of the legacy anonymous-read attestations bucket are
-//! intentionally absent on the steady-state path — the snapshot is the
-//! complete trust artifact.
+//! credentials (the EC2 instance role grants scoped `s3:GetObject` on the
+//! snapshot key). The legacy anonymous-read attestations bucket is not
+//! consulted on the steady-state path — the snapshot is the complete trust
+//! artifact.
 
 use axum::{
     body::Bytes,
@@ -86,6 +86,12 @@ async fn main() {
         .expect("Server error");
 }
 
+// Process-up health check only. Deliberately does NOT validate snapshot
+// availability — making ALB health depend on snapshot reads would create
+// a replacement loop on cold starts before the snapshot exists, and on
+// any S3 transient. Snapshot freshness/correctness is observed via the
+// stub target group's 5xx rate alarm and a synthetic `/signers` canary
+// (tracked as follow-up; see PR description).
 async fn health() -> &'static str {
     "ok"
 }

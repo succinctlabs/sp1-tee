@@ -1,4 +1,5 @@
 import * as cdk from "aws-cdk-lib";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import { Construct } from "constructs";
 import { Environment } from "./base";
@@ -57,11 +58,19 @@ export class Sp1TeeStubStack extends cdk.Stack {
             ],
         });
 
-        // Scope IAM to the snapshot key under this version. `grantRead`
-        // would also work but covers the entire bucket; we only need a
-        // single object so use `grantRead` with a key arn for narrower
-        // blast radius.
-        props.snapshotsBucket.grantRead(role);
+        // Key-scoped IAM: the stub only needs `s3:GetObject` on the
+        // snapshot artifact for whatever SP1 TEE version it serves. Using
+        // `bucket.grantRead(role)` would expand to GetBucket*/List* over
+        // the whole bucket — much broader than necessary. Wildcard
+        // `signers-v*.bin` covers future version bumps without re-deploy.
+        role.addToPrincipalPolicy(
+            new iam.PolicyStatement({
+                actions: ["s3:GetObject"],
+                resources: [
+                    props.snapshotsBucket.arnForObjects("signers-v*.bin"),
+                ],
+            }),
+        );
 
         // Dedicated SG. CDK auto-adds the ALB SG → port 8080 ingress when the
         // ASG is attached to the target group below, so no explicit ingress

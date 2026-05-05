@@ -34,6 +34,15 @@ struct Args {
     /// Print what would be written without uploading.
     #[clap(long)]
     dry_run: bool,
+
+    /// Allow the new snapshot's signer count to be lower than the
+    /// previous snapshot's. Off by default — the generator refuses to
+    /// shrink the served signer set, since that would let a partial
+    /// attestation refresh clobber a known-good snapshot with degraded
+    /// data. Pass this flag for legitimate signer-removal events
+    /// (decommission, key rotation that drops a signer).
+    #[clap(long)]
+    allow_shrink: bool,
 }
 
 /// Operator-grep-friendly error type. Each variant is a stable, searchable
@@ -41,11 +50,17 @@ struct Args {
 #[derive(Debug, thiserror::Error)]
 #[allow(clippy::large_enum_variant)]
 enum GenerateError {
-    #[error("snapshot-generate/list-attestations: {0}")]
-    ListAttestations(#[from] sp1_tee_host::attestations::GetAttestationError),
+    #[error("snapshot-generate/fetch-raw-attestations: {0}")]
+    FetchRawAttestations(#[from] sp1_tee_host::attestations::GetAttestationError),
 
     #[error("snapshot-generate/no-valid-signers: 0 valid signers derived from {0} raw attestations (refusing to overwrite a known-good snapshot)")]
     NoValidSigners(usize),
+
+    #[error("snapshot-generate/read-existing: {0}")]
+    ReadExisting(#[from] sp1_tee_host::attestations::ReadSnapshotError),
+
+    #[error("snapshot-generate/shrink-refused: previous snapshot had {previous} signers, new derivation has {current} (pass --allow-shrink for intentional signer removal)")]
+    ShrinkRefused { previous: usize, current: usize },
 
     #[error("snapshot-generate/upload: {0}")]
     Upload(#[from] sp1_tee_host::attestations::WriteSnapshotError),
@@ -82,6 +97,39 @@ async fn main() -> Result<(), GenerateError> {
         signers.len(),
         source_count
     );
+
+    // Shrink protection. Read the existing snapshot at the same
+    // SP1_TEE_VERSION; if it was a valid same-version snapshot with more
+    // signers than we just derived, refuse to overwrite unless the
+    // operator explicitly opts in via `--allow-shrink`. Defends against
+    // a partial save_attestation cycle producing a degraded (but
+    // non-empty) snapshot that would still pass the read-side
+    // empty-check.
+    //
+    // NotFound (first deploy of this version) and any validation error
+    // (corrupt / schema bump / version mismatch / empty) are intentionally
+    // treated as "no comparable previous snapshot, write fresh" — those
+    // are the cases the operator actually wants to recover from.
+    match sp1_tee_host::attestations::read_signers_snapshot(&args.bucket, SP1_TEE_VERSION).await {
+        Ok(previous) => {
+            if previous.signers.len() > signers.len() && !args.allow_shrink {
+                return Err(GenerateError::ShrinkRefused {
+                    previous: previous.signers.len(),
+                    current: signers.len(),
+                });
+            }
+            tracing::info!(
+                "previous snapshot had {} signers; proceeding (allow_shrink={})",
+                previous.signers.len(),
+                args.allow_shrink,
+            );
+        }
+        Err(e) => {
+            tracing::info!(
+                "no comparable previous snapshot ({e}); proceeding without shrink check"
+            );
+        }
+    }
 
     let snapshot =
         sp1_tee_host::attestations::build_snapshot(SP1_TEE_VERSION, signers, source_count);
